@@ -1,0 +1,46 @@
+
+---
+
+## ⚙️ **.gitignore**
+
+Salve o conteúdo abaixo em um arquivo chamado `.gitignore` também na raiz do projeto:
+
+```gitignore
+
+# Ambiente virtual
+.venv/
+venv/
+env/
+
+# Arquivos de compilação Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos do Django
+*.log
+db.sqlite3
+media/
+staticfiles/
+*.pot
+*.pyc
+
+# Configurações locais
+*.env
+.env.local
+.env.production
+.DS_Store
+
+
+# VSCode / IDEs
+.vscode/
+.idea/
+*.swp
+
+# Cache do Tailwind e Node
+node_modules/
+dist/
+build/
+
+# Arquivos temporários do sistema
+Thumbs.db
