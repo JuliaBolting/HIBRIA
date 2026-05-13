@@ -1,0 +1,1 @@
+#divide o texto em frases ou blocos menores antes da extração.
