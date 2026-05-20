@@ -1,0 +1,32 @@
+{
+    "url": "https://g1.globo.com/sp/bauru-marilia/noticia/2026/05/11/policia-encontra-cerveja-e-cooler-em-carro-de-motorista-suspeito-de-provocar-acidente-que-matou-quatro-jovens-no-dia-das-maes.ghtml",
+    "title": "Polícia encontra cerveja e cooler em carro de motorista suspeito de provocar acidente que matou quatro jovens no Dia das Mães",
+    "description": "Jovens de 17 a 25 anos morreram após duas motos serem atingidas por carro conduzido por motorista embriagado no Dia das Mães, em Pederneiras (SP).",
+    "render_method": "static",
+    "paywall_detected": false,
+    "warnings": [],
+    "block_count": 2,
+    "char_count": 351,
+    "blocks_clean": [
+        "Motorista bêbado mata quatro jovens e é preso após fugir no interior de SP",
+        "Latas de cerveja e um cooler com bebidas foram encontrados dentro do carro do motorista embriagado suspeito de provocar o acidente que matou quatro jovens na Rodovia Comandante João Ribeiro de Barros (SP-225), em Pederneiras (SP), na madrugada deste domingo (10), Dia das Mães."
+    ],
+    "blocks_bert": [
+        "Motorista bêbado mata quatro jovens e é preso após fugir no interior de São Paulo",
+        "Latas de cerveja e um cooler com bebidas foram encontrados dentro do carro do motorista embriagado suspeito de provocar o acidente que matou quatro jovens na Rodovia Comandante João Ribeiro de Barros (São Paulo-225), em Pederneiras (São Paulo), na madrugada deste domingo (10), Dia das Mães."
+    ],
+    "blocks_tfidf": [
+        "motorista bebar matar jovem prender apo fugir interior sao Paulo",
+        "lata cerveja cooler bebida encontrar carro motorista embriagar suspeito provocar acidente matar jovem rodovia comandante Joao Ribeiro barro sao paulo-225 pederneira sao Paulo madrugada domingo dia Maes"
+    ],
+    "blocks_similarity": [
+        "motorista bebado mata jovens preso apos fugir no interior de sao paulo",
+        "latas de cerveja cooler com bebidas foram encontrados dentro do carro do motorista embriagado suspeito de provocar acidente que matou jovens na rodovia comandante joao ribeiro de barros sao paulo-225 em pederneiras sao paulo na madrugada deste domingo dia das maes"
+    ],
+    "segments": null,
+    "claims": null,
+    "score": null,
+    "label": null,
+    "evidence": null,
+    "explanation": null
+}
