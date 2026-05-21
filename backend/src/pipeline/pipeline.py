@@ -33,8 +33,9 @@ class PipelineResult:
     blocks_tfidf:      list[str] = field(default_factory=list)
     blocks_similarity: list[str] = field(default_factory=list)
 
-    # ── segmentation (a implementar) ───────────────────────
-    segments:          list[str] | None = None
+    # ── segmentation ───────────────────────
+    sentence_texts: list[str] | None = None
+    segment_texts:  list[str] | None = None
 
     # ── claim_detector (a implementar) ─────────────────────
     claims:            list[str] | None = None
@@ -125,6 +126,24 @@ class PreprocessingPipeline:
             result.blocks_clean, profile="similarity"
         )
         return result
+    @staticmethod
+    def _step_segment(result: PipelineResult) -> PipelineResult:
+
+        from pipeline.claim_extraction.segmentation import TextSegmenter
+
+        output = TextSegmenter.segment(result.blocks_clean)
+
+        result.sentence_texts = output["sentence_texts"]
+        result.segment_texts  = output["segment_texts"]
+        result.segments       = output["segments"]      # campo já existe no dataclass
+
+        stats = output["stats"]
+        # loga as métricas como o extractor e o cleaner fazem
+        result.warnings  # não adiciona warning — só info
+        # retorna o stats para o main.py logar se quiser
+        result._segmentation_stats = stats
+        return result
+
 
     @classmethod
     def run(cls, url: str) -> PipelineResult:
@@ -134,8 +153,8 @@ class PreprocessingPipeline:
             ("extractor",   lambda r: cls._step_extract(url, r)),
             ("cleaner",     cls._step_clean),
             ("normalizer",  cls._step_normalize),
-            # ("segmentation",  cls._step_segment),   ← adiciona quando implementar
-            # ("claim_detector", cls._step_detect),   ← idem
+            ("segmentation",  cls._step_segment),   
+            # ("claim_detector", cls._step_detect),   ← a implementar depois da segmentação
         ]
 
         for name, step in steps:
