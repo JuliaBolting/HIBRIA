@@ -1,1 +1,0 @@
-#etecta o posicionamento da evidência em relação à claim.

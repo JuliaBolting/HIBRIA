@@ -1,1 +1,0 @@
-#aqui fica o modelo de classificação usando BERTimbau

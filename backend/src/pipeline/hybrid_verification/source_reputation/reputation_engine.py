@@ -1,1 +1,0 @@
-#Calcula reputação da fonte.
