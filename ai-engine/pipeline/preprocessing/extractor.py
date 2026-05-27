@@ -169,10 +169,15 @@ class TextExtractor:
     # para evitar capturar menus ou sidebars em sites sem estrutura semântica.
     # -------------------------------------------------------------------------
     PORTAL_PARAGRAPH_SELECTORS = [
-        "p.content-text__container",    # G1, GE e demais portais Globo
+        "p.content-text__container",    # G1, GE e demais portais Globo — parágrafos principais
+        "div.content-text__container",  # G1/Globo — variação onde o conteúdo vem em div, não em p
+        ".mc-article-body p",           # G1/Globo — corpo de matéria em layout moderno
+        ".mc-column p",                 # G1/Globo — coluna principal da reportagem
+        ".wall p",                      # G1/Globo — conteúdo dentro de área protegida/wall
+        ".protected-content p",         # G1/Globo — conteúdo marcado como protegido, mas visível no HTML
         "p.article__text",              # Folha de S.Paulo
         "[class*='article-body'] p",    # padrão genérico de portais de notícia
-        "[class*='story-body'] p",      # Reuters, AP (versões em português)
+        "[class*='story-body'] p",      # Reuters, AP e portais internacionais
         "[class*='mat-body'] p",        # Estadão
         "[class*='news-body'] p",       # portais regionais brasileiros
         "[class*='entry-content'] p",   # WordPress — usado por milhares de blogs
@@ -343,24 +348,29 @@ class TextExtractor:
             )
 
             try:
-                # "networkidle": aguarda rede estabilizar antes de capturar o HTML
-                # cobre a maioria dos SPAs que carregam dados via fetch/XHR
-                page.goto(url, wait_until="networkidle", timeout=30_000)
+                # "domcontentloaded" é mais seguro que "networkidle" em portais de notícia,
+                # porque anúncios, métricas e scripts de tracking podem manter a rede ativa
+                # por muito tempo e causar timeout mesmo quando o conteúdo principal já carregou.
+                page.goto(url, wait_until="domcontentloaded", timeout=45_000)
 
-                # scroll para metade da página — ativa lazy loading de artigos
-                # que só carregam parágrafos quando o usuário chega até eles
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+                # aguarda renderização inicial do conteúdo
+                page.wait_for_timeout(3000)
 
-                # espera extra para renderizações assíncronas tardias
-                page.wait_for_timeout(1500)
+                # rola a página em etapas para ativar lazy loading de parágrafos/imagens
+                for _ in range(6):
+                    page.evaluate("window.scrollBy(0, document.body.scrollHeight / 6)")
+                    page.wait_for_timeout(1000)
 
-                # captura o HTML com o DOM completamente renderizado
+                # garante que chegou ao final e aguarda renderizações tardias
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(2000)
+
+                # captura o HTML renderizado
                 html = page.content()
 
             except PWTimeout:
                 raise ExtractionError(f"Playwright timeout ao renderizar: {url}")
             finally:
-                # sempre fecha o browser — evita processos zumbis
                 browser.close()
 
         return html
@@ -520,9 +530,9 @@ class TextExtractor:
         for tag in candidate_tags:
             # descarta parágrafos dentro de elementos de paywall
             # (conteúdo bloqueado que passou pela limpeza de SELECTORS_TO_REMOVE)
-            if tag.find_parent(class_=lambda c: c and (
-                "wall" in c or "paywall" in c or "protected" in c
-            )):
+            parent_class = " ".join(tag.find_parent().get("class", [])) if tag.find_parent() else ""
+
+            if "paywall" in parent_class:
                 continue
 
             # extrai texto limpo da tag, unindo textos de tags filhas com espaço
@@ -587,7 +597,7 @@ class TextExtractor:
             response = cls._fetch_static(url)
             # usa o encoding detectado automaticamente pelo chardet
             # evita lixo de caracteres em sites com charset mal declarado
-            response.encoding = response.apparent_encoding
+            response.encoding = "utf-8"
             html = response.text
         except ExtractionError as e:
             # estática falhou completamente (timeout, conexão, bloqueio definitivo)
@@ -600,19 +610,47 @@ class TextExtractor:
         soup = cls._parse_html(html)
         blocks = cls._extract_blocks(soup)
 
-        # ── tentativa 2: Playwright se SPA detectado ─────────────────────────
-        # a estratégia estática pode ter "funcionado" (sem exceção) mas
-        # retornado um HTML de SPA vazio — detectamos isso aqui
-        if render_method == "static" and cls._needs_js_render(html, blocks):
-            warnings.append("SPA detectado — usando Playwright para renderizar JS.")
-            html = cls._fetch_with_playwright(url)
-            render_method = "playwright"
-            soup = cls._parse_html(html)
-            blocks = cls._extract_blocks(soup)
+       # ── tentativa 2: Playwright se SPA detectado OU conteúdo estático insuficiente ──
+        # Alguns portais podem entregar apenas título, resumo ou primeiros parágrafos
+        # na requisição HTTP estática, seja por carregamento dinâmico, proteção do portal,
+        # estrutura do HTML ou limitação da resposta enviada para clientes não renderizados.
+        # Por isso, quando o conteúdo extraído é muito curto, acionamos o Playwright
+        # para tentar obter o DOM renderizado de forma mais próxima ao navegador real.
+        content_too_short = sum(len(b) for b in blocks) < 1200
+
+        if render_method == "static" and (
+            cls._needs_js_render(html, blocks) or content_too_short
+        ):
+            try:
+                warnings.append(
+                    "Conteúdo estático insuficiente — usando Playwright para tentar obter o texto completo."
+                )
+
+                rendered_html = cls._fetch_with_playwright(url)
+                rendered_soup = cls._parse_html(rendered_html)
+                rendered_blocks = cls._extract_blocks(rendered_soup)
+
+                # Só substitui a extração estática se o Playwright realmente trouxer
+                # mais conteúdo textual útil.
+                if sum(len(b) for b in rendered_blocks) > sum(len(b) for b in blocks):
+                    html = rendered_html
+                    soup = rendered_soup
+                    blocks = rendered_blocks
+                    render_method = "playwright"
+                else:
+                    warnings.append(
+                        "Playwright executado, mas não retornou conteúdo maior que a extração estática."
+                    )
+
+            except ExtractionError as e:
+                warnings.append(
+                    f"Playwright falhou ({e}); mantendo conteúdo estático parcial."
+                )
 
         # ── detecção de paywall ──────────────────────────────────────────────
-        # registra como warning, não erro — análise continua com o trecho livre
+        # registra como warning, não erro — análise continua com o trecho disponível
         paywall_detected = cls._detect_paywall(soup, html)
+
         if paywall_detected:
             warnings.append(
                 "Paywall detectado: conteúdo pode estar incompleto. "

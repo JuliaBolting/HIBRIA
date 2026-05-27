@@ -64,6 +64,12 @@ class TextCleaner:
         r"|voltar\s+ao\s+topo"
         r"|ouça\s+(esta?\s+)?notícia"
         r"|tempo\s+de\s+leitura"
+        r"|participe\s+do\s+canal"
+        r"|no\s+whatsapp"
+        r"|veja\s+mais\s+not[ií]cias"
+        r"|not[ií]cias\s+da\s+regi[aã]o"
+        r"|v[ií]deos?:\s*assista"
+        r"|assista\s+[àa]s?\s+reportagens"
         r"|minutos?\s+de\s+leitura)",
         re.IGNORECASE
     )
