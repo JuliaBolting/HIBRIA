@@ -304,23 +304,6 @@ class TextExtractor:
 
     @staticmethod
     def _fetch_with_playwright(url: str) -> str:
-        """
-        Renderiza a página com Chromium headless via Playwright.
-
-        Fluxo:
-          1. Abre o navegador e bloqueia recursos desnecessários (imagens, fontes,
-             mídia) para reduzir o tempo de carregamento de ~15s para ~3-5s.
-          2. Navega até a URL aguardando "networkidle" — estado em que não há
-             requisições de rede por 500ms, indicando que o JS terminou de rodar.
-          3. Faz scroll até a metade da página para disparar lazy loading de
-             conteúdo que só carrega quando entra no viewport.
-          4. Aguarda 1.5s adicional para renderizações assíncronas tardias.
-          5. Captura o HTML final já com o DOM completo.
-
-        Playwright é importado dentro do método (import tardio) para que o
-        extractor funcione normalmente mesmo sem o Playwright instalado,
-        só falhando ao tentar usar essa estratégia específica.
-        """
         try:
             from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
         except ImportError:
@@ -331,42 +314,162 @@ class TextExtractor:
             )
 
         with sync_playwright() as pw:
-            # inicia Chromium em modo headless (sem interface gráfica)
-            browser = pw.chromium.launch(headless=True)
-            context = browser.new_context(
-                user_agent=TextExtractor.HEADERS["User-Agent"],
-                locale="pt-BR",           # garante conteúdo em português
-                java_script_enabled=True, # obrigatório para SPAs
+            browser = pw.chromium.launch(
+                headless=True,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                ]
             )
+            context = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                locale="pt-BR",
+                viewport={"width": 1280, "height": 800},
+                java_script_enabled=True,
+                ignore_https_errors=True,
+            )
+
+            context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+                window.chrome = { runtime: {} };
+            """)
+
             page = context.new_page()
 
-            # bloqueia recursos que não contribuem com texto
-            # reduz significativamente o tempo de carregamento
             page.route(
-                "**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2,ttf,mp4,mp3,avi}",
+                "**/*.{woff,woff2,ttf,mp4,mp3,avi,ogg}",
                 lambda route: route.abort(),
             )
 
             try:
-                # "domcontentloaded" é mais seguro que "networkidle" em portais de notícia,
-                # porque anúncios, métricas e scripts de tracking podem manter a rede ativa
-                # por muito tempo e causar timeout mesmo quando o conteúdo principal já carregou.
                 page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-
-                # aguarda renderização inicial do conteúdo
-                page.wait_for_timeout(3000)
-
-                # rola a página em etapas para ativar lazy loading de parágrafos/imagens
-                for _ in range(6):
-                    page.evaluate("window.scrollBy(0, document.body.scrollHeight / 6)")
-                    page.wait_for_timeout(1000)
-
-                # garante que chegou ao final e aguarda renderizações tardias
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(2000)
 
-                # captura o HTML renderizado
-                html = page.content()
+                # aguarda primeiro parágrafo com conteúdo real aparecer
+                try:
+                    page.wait_for_function("""
+                        () => {
+                            const selectors = [
+                                'p.content-text__container',
+                                'p.article__text',
+                                '[class*="article-body"] p',
+                                '[itemprop="articleBody"] p',
+                            ];
+                            for (const sel of selectors) {
+                                const els = document.querySelectorAll(sel);
+                                if (Array.from(els).some(el => el.innerText.trim().length > 30))
+                                    return true;
+                            }
+                            const ps = document.querySelectorAll('p');
+                            return Array.from(ps).filter(
+                                p => p.innerText.trim().length > 80
+                            ).length >= 3;
+                        }
+                    """, timeout=15_000)
+                except Exception:
+                    pass
+
+                # scroll progressivo para carregar todos os parágrafos
+                for _ in range(6):
+                    page.evaluate(
+                        "window.scrollBy(0, document.body.scrollHeight / 6)"
+                    )
+                    page.wait_for_timeout(800)
+
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(1500)
+
+                # ── extração direta do DOM renderizado ──────────────────────────
+                # O AMP mantém o conteúdo no DOM em memória mas não serializa
+                # corretamente no outerHTML. Extraímos o innerText diretamente
+                # via JavaScript antes de capturar o HTML.
+                is_amp = page.evaluate(
+                    "() => document.documentElement.hasAttribute('amp-version') "
+                    "|| document.documentElement.classList.contains('i-amphtml-singledoc')"
+                )
+
+                if is_amp:
+                    # extrai título e parágrafos diretamente do DOM renderizado
+                    extracted = page.evaluate("""
+                        () => {
+                            const result = {
+                                title: '',
+                                paragraphs: [],
+                                description: ''
+                            };
+
+                            // título
+                            const h1 = document.querySelector('h1');
+                            result.title = h1 ? h1.innerText.trim() : document.title;
+
+                            // meta description
+                            const meta = document.querySelector('meta[name="description"]');
+                            result.description = meta ? meta.content : '';
+
+                            // parágrafos do artigo — tenta seletores específicos
+                            const selectors = [
+                                'p.content-text__container',
+                                'p.article__text',
+                                '[class*="article-body"] p',
+                                '[itemprop="articleBody"] p',
+                                'article p',
+                                'main p',
+                            ];
+
+                            let found = false;
+                            for (const sel of selectors) {
+                                const els = document.querySelectorAll(sel);
+                                const texts = Array.from(els)
+                                    .map(el => el.innerText.trim())
+                                    .filter(t => t.length > 40);
+
+                                if (texts.length >= 3) {
+                                    result.paragraphs = texts;
+                                    found = true;
+                                    break;
+                                }
+                            }
+
+                            // fallback: todos os <p> com conteúdo suficiente
+                            if (!found) {
+                                const ps = document.querySelectorAll('p');
+                                result.paragraphs = Array.from(ps)
+                                    .map(p => p.innerText.trim())
+                                    .filter(t => t.length > 40);
+                            }
+
+                            return result;
+                        }
+                    """)
+
+                    # monta HTML sintético com o conteúdo extraído do DOM
+                    # o pipeline do extractor espera HTML para parsear
+                    paragraphs_html = "\n".join(
+                        f"<p>{p}</p>" for p in extracted["paragraphs"]
+                    )
+                    html = f"""
+                        <html>
+                        <head>
+                            <title>{extracted['title']}</title>
+                            <meta name="description" content="{extracted['description']}">
+                        </head>
+                        <body>
+                            <article itemprop="articleBody">
+                                <h1>{extracted['title']}</h1>
+                                {paragraphs_html}
+                            </article>
+                        </body>
+                        </html>
+                    """
+                else:
+                    html = page.content()
 
             except PWTimeout:
                 raise ExtractionError(f"Playwright timeout ao renderizar: {url}")
