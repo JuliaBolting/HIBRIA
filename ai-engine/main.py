@@ -4,87 +4,61 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-from pipeline.pipeline import PreprocessingPipeline
-from pipeline.preprocessing import ExtractionError
+print(f"Inicializando HÍBRIA...")
 
-OUTPUT_PATH = Path("extension/public/output.json")
+from pipeline.preprocessing.normalization import TextNormalizer
+from pipeline.analysis.embeddings import EmbeddingModel
+
+TextNormalizer._get_nlp()       # carrega spaCy na RAM
+EmbeddingModel().warmup()       # carrega SentenceTransformer na RAM
+
+print("Modelos prontos.\n")
+
+from pipeline.pipeline import HibriaPipeline
+from pipeline.preprocessing.extractor import ExtractionError
+
+OUTPUT_PATH = Path(__file__).parent.parent / "extension" / "public" / "output.json"
 URL = "https://g1.globo.com/sp/bauru-marilia/noticia/2026/05/11/policia-encontra-cerveja-e-cooler-em-carro-de-motorista-suspeito-de-provocar-acidente-que-matou-quatro-jovens-no-dia-das-maes.ghtml"
 
 try:
-    result = PreprocessingPipeline.run(URL)
+    result = HibriaPipeline.run(URL)
 
-    # Classificação da qualidade da extração:
-    #
-    # success → conteúdo suficiente para seguir no pipeline
-    # partial → pouco conteúdo; análise pode ficar incompleta
-    # empty   → nenhum bloco textual extraído; só metadados
-    
-    extraction_status = "success"
-
-    if result.block_count == 0 or result.char_count == 0:
-        extraction_status = "empty"
-        result.warnings.append(
-            "Nenhum bloco textual foi extraído; apenas metadados da página foram encontrados."
-        )
-
-    elif result.char_count < 1000:
-        extraction_status = "partial"
-        result.warnings.append(
-            "Pouco conteúdo textual foi extraído; a análise pode ficar incompleta."
-        )
-
-    # Guarda o status no objeto, mesmo que o campo ainda não exista formalmente
-    # no PipelineResult. O to_dict() precisa incluir esse campo para ele aparecer no JSON.
-    result.extraction_status = extraction_status
-
-    print(
-        f"[extractor]  {result.block_count} blocos · "
-        f"{result.char_count} chars · via {result.render_method} · status={extraction_status}"
-    )
-
-    print(
-        f"[cleaner]    {len(result.blocks_clean)} blocos limpos"
-    )
-
-    print(
-        f"[normalizer] {len(result.blocks_bert)} blocos BERT · "
-        f"{len(result.blocks_tfidf)} blocos TF-IDF · "
-        f"{len(result.blocks_similarity)} blocos similarity"
-    )
-
-    print(
-        f"[segmenter]  {result.sentence_count} sentenças · "
-        f"{result.segment_count} segmentos"
-    )
-
-    if result.segmentation_stats:
-        print(
-            f"[segmenter]  {result.segmentation_stats.get('total_token_count', 0)} tokens · "
-            f"média {result.segmentation_stats.get('avg_tokens_per_sent', 0)} tokens/sentença"
-        )
+    # log resumido no terminal
+    print(f"\n{'='*60}")
+    print(f"  HÍBRIA — Resultado da Análise")
+    print(f"{'='*60}")
+    print(f"  URL:        {result.url[:70]}...")
+    print(f"  Título:     {result.title[:70]}")
+    print(f"  Método:     {result.render_method}")
+    print(f"  Blocos:     {result.block_count} ({result.char_count} chars)")
+    print(f"  Sentenças:  {len(result.sentences or [])}")
+    print(f"  Claims:     {result.claim_count}")
+    print(f"  Evidências: {result.evidence_count}")
+    print(f"  Score:      {result.score_final or 'pendente'}")
+    print(f"  Label:      {result.label_final or 'pendente'}")
+    print(f"{'='*60}")
+    print(f"  Tempo por etapa:")
+    for step, t in result._processing_time.items():
+        print(f"    {step:<20} {t:.3f}s")
+    print(f"{'='*60}\n")
 
     if result.warnings:
-        for warning in result.warnings:
-            print(f"[aviso] {warning}")
+        print("Avisos:")
+        for w in result.warnings:
+            print(f"  ⚠ {w}")
+        print()
 
-    output = result.to_dict()
-
-    # Garante que o status apareça no JSON mesmo antes de ajustar o PipelineResult
-    output["extraction_status"] = extraction_status
-
+    # salva JSON completo
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     OUTPUT_PATH.write_text(
-        json.dumps(output, indent=4, ensure_ascii=False),
+        json.dumps(result.to_dict(), indent=4, ensure_ascii=False),
         encoding="utf-8",
     )
-
-    print(f"\nSalvo em {OUTPUT_PATH}")
+    print(f"Salvo em {OUTPUT_PATH}")
 
 except ExtractionError as e:
     print(f"[ERRO] {e}", file=sys.stderr)
     sys.exit(1)
-
 except Exception as e:
     print(f"[ERRO inesperado] {e}", file=sys.stderr)
-    sys.exit(1)
+    raise
