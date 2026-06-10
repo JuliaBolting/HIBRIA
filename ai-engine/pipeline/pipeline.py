@@ -9,7 +9,7 @@
 #
 # Fluxo atual (implementado):
 #   extractor → cleaner → normalizer → segmentation →
-#   claim_detector → retriever (Wikipedia + VectorStore)
+#   claim_detector → retriever (VectorStore/FAISS) → similarity
 #
 # Fluxo completo (TCC):
 #   + similarity → stance_model → bertimbau_classifier →
@@ -97,6 +97,9 @@ class PipelineResult:
 
     # ── response_formatter (pendente) ─────────────────────────────────────────
     response: dict | None = None  # JSON final para a extensão
+    
+    # ── auto_indexer ─────────────────────────────────────────────────────────────
+    auto_indexing: dict | None = None
 
     # ── métricas internas ─────────────────────────────────────────────────────
     _segmentation_stats: dict = field(default_factory=dict)
@@ -171,17 +174,25 @@ class PipelineResult:
                 {
                     "claim_id": r.claim.claim_id,
                     "claim_text": r.claim.text,
+                    "rag_score": r.rag_score,
                     "layers_used": r.layers_used,
                     "layers_failed": r.layers_failed,
                     "retrieval_time": r.retrieval_time,
                     "evidences": [
                         {
+                            "evidence_id": e.evidence_id,
                             "text": e.text,
                             "source": e.source,
+                            "title": e.title,
                             "url": e.url,
+                            "domain": e.domain,
                             "similarity": e.similarity,
                             "published_at": e.published_at,
                             "retrieval_layer": e.retrieval_layer,
+                            "source_type": e.source_type,
+                            "trusted_source": e.trusted_source,
+                            "stance": e.stance,
+                            "metadata": e.metadata,
                         }
                         for e in r.evidences
                     ],
@@ -206,7 +217,9 @@ class PipelineResult:
                         ),
                     }
                     for r in self.similarity_scores
-                ]if self.similarity_scores else None,
+                ]
+                if self.similarity_scores
+                else None
             ),
             # resultados de análise (pendentes — None até implementar)
             "stance_results": self.stance_results,
@@ -218,6 +231,7 @@ class PipelineResult:
             "label_final": self.label_final,
             "score_breakdown": self.score_breakdown,
             "explanation": self.explanation,
+            "auto_indexing": self.auto_indexing,
             # tempo de processamento por etapa
             "processing_time": self._processing_time,
         }
@@ -400,7 +414,10 @@ class HibriaPipeline:
             return result
 
         vector_store = HibriaPipeline._get_vector_store()
-        retriever = EvidenceRetriever(vector_store=vector_store)
+        retriever = EvidenceRetriever(
+            vector_store=vector_store,
+            current_url=result.url,
+        )
 
         result.retrieval_results = retriever.retrieve_batch(
             result.claims,
@@ -487,28 +504,60 @@ class HibriaPipeline:
     @staticmethod
     def _step_reputation(result: PipelineResult) -> PipelineResult:
         """
-        🔲 PENDENTE: reputation_engine.py
-        Avalia a reputação do domínio da notícia.
-        Consulta a tabela fontes_confiaveis do PostgreSQL.
+        Etapa 8: avaliação de reputação da fonte.
+        reputation_engine.py → domínio da URL → score de reputação.
         """
-        # TODO: implementar
-        # from pipeline.analysis.reputation_engine import ReputationEngine
-        # result.reputation = ReputationEngine.evaluate(result.url)
+        from pipeline.analysis.reputation_engine import ReputationEngine
+
+        result.reputation = ReputationEngine.evaluate(result.url)
+
+        logger.info(
+            f"[reputation] domínio={result.reputation['domain']} · "
+            f"score={result.reputation['score']}"
+        )
+
         return result
 
     @staticmethod
     def _step_aggregate(result: PipelineResult) -> PipelineResult:
         """
-        🔲 PENDENTE: aggregator.py
-        Combina todos os scores em um índice final 0-100.
-        Fórmula definida na seção 3.5.6 do TCC (a ser especificada).
+        Etapa 9: agregação dos scores parciais.
+        aggregator.py → score_final + label_final + score_breakdown.
         """
-        # TODO: implementar
-        # from pipeline.output.aggregator import Aggregator
-        # agg = Aggregator.aggregate(result)
-        # result.score_final     = agg["score"]
-        # result.label_final     = agg["label"]
-        # result.score_breakdown = agg["breakdown"]
+        from pipeline.output.aggregator import Aggregator
+
+        aggregated = Aggregator.aggregate(result)
+
+        result.score_final = aggregated["score"]
+        result.label_final = aggregated["label"]
+        result.score_breakdown = aggregated["breakdown"]
+
+        logger.info(
+            f"[aggregator] score={result.score_final} · " f"label={result.label_final}"
+        )
+
+        return result
+
+    @staticmethod
+    def _step_auto_index(result: PipelineResult) -> PipelineResult:
+        """
+        Etapa 10: indexação automática de notícias aprovadas.
+        auto_indexer.py → adiciona ao FAISS como analyzed_news se score_final for confiável.
+        """
+        from pipeline.retrieval.auto_indexer import AutoIndexer
+
+        vector_store = HibriaPipeline._get_vector_store()
+
+        result.auto_indexing = AutoIndexer.index_result(
+            result,
+            vector_store=vector_store,
+        )
+
+        logger.info(
+            f"[auto_indexer] indexed={result.auto_indexing['indexed']} · "
+            f"reason={result.auto_indexing['reason']}"
+        )
+
         return result
 
     @staticmethod
@@ -565,6 +614,9 @@ class HibriaPipeline:
             ("claim_detector", cls._step_detect_claims),
             ("retriever", cls._step_retrieve),
             ("similarity", cls._step_similarity),
+            ("reputation", cls._step_reputation),
+            ("aggregator", cls._step_aggregate),
+            ("auto_indexer", cls._step_auto_index),
         ]
 
         # ── steps pendentes ───────────────────────────────────────────────────
@@ -572,8 +624,6 @@ class HibriaPipeline:
             ("stance", cls._step_stance),
             ("bertimbau", cls._step_bertimbau),
             ("text_features", cls._step_text_features),
-            ("reputation", cls._step_reputation),
-            ("aggregator", cls._step_aggregate),
             ("explanation", cls._step_explain),
             ("formatter", cls._step_format),
         ]
