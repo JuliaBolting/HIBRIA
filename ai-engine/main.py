@@ -1,6 +1,9 @@
 import sys
 import json
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -18,7 +21,7 @@ from pipeline.pipeline import HibriaPipeline
 from pipeline.preprocessing.extractor import ExtractionError
 
 OUTPUT_PATH = Path(__file__).parent.parent / "extension" / "public" / "output.json"
-URL = "https://g1.globo.com/sp/bauru-marilia/noticia/2026/05/11/policia-encontra-cerveja-e-cooler-em-carro-de-motorista-suspeito-de-provocar-acidente-que-matou-quatro-jovens-no-dia-das-maes.ghtml"
+URL = "https://g1.globo.com/trabalho-e-carreira/noticia/2026/06/10/sem-solucao-a-bola-nao-rola-professores-pedem-aumento-de-100percent-em-protestos-contra-a-copa-no-mexico.ghtml"
 
 try:
     result = HibriaPipeline.run(URL)
