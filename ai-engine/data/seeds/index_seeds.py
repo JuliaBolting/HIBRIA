@@ -178,7 +178,7 @@ def index_fakebr(
                 "title":    file_meta.get("title", txt_path.stem),
                 "category": file_meta.get("category", ""),
                 "corpus":   "fake.br",
-                "label":    "true",
+                "label":    file_meta.get("label", "true"),
             },
         ))
 
