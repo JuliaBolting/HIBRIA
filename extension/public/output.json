@@ -1,0 +1,1883 @@
+{
+    "url": "https://g1.globo.com/trabalho-e-carreira/noticia/2026/06/10/sem-solucao-a-bola-nao-rola-professores-pedem-aumento-de-100percent-em-protestos-contra-a-copa-no-mexico.ghtml",
+    "title": "'Sem solução, a bola não rola': professores pedem aumento de 100% em protestos contra a Copa no México",
+    "description": "Com bloqueios, incêndio em prédio público e confrontos com forças de segurança, protestos de professores se intensificam no México antes da Copa do Mundo.",
+    "render_method": "playwright",
+    "paywall_detected": false,
+    "warnings": [
+        "Conteúdo estático insuficiente — usando Playwright para tentar obter o texto completo."
+    ],
+    "block_count": 20,
+    "char_count": 4131,
+    "blocks_clean": [
+        "A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%. A situação aumenta a tensão no país e ameaça a realização do torneio.",
+        "Bloqueios de vias estratégicas, ocupações e confrontos marcaram os últimos dias na Cidade do México. Os sindicatos da categoria aproveitam a visibilidade global do evento para pressionar o governo por reajustes salariais e mudanças nas condições de trabalho.",
+        "Nesta terça-feira (9), milhares de manifestantes interditaram uma avenida que dá acesso ao Estádio Azteca, um dos principais palcos da competição, segundo a agência AFP. O local receberá a partida de abertura da Copa do Mundo, entre México e África do Sul.",
+        "A mobilização é organizada pela Coordenadoria Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do principal sindicato da categoria.",
+        "Considerada a ala mais combativa dos professores mexicanos, a CNTE convocou uma greve nacional por tempo indeterminado em 1º de junho e, desde então, ampliou sua presença nas ruas da capital. Além dela, o Sindicato Nacional dos Trabalhadores da Educação (SNTE) também reivindica reajustes, embora adote uma postura mais moderada.",
+        "Os atos reúnem principalmente professores da educação básica, incluindo trabalhadores com contratos parciais, que representam uma parcela significativa da categoria no país.",
+        "O principal impasse está na remuneração. A CNTE exige um aumento salarial de 100%, proposta rejeitada pelo governo federal por ser considerada inviável.",
+        "A insatisfação ganhou força após o , em maio de 2025, de um reajuste de 10%, com aplicação prevista apenas para setembro de 2026. Para o sindicato, o percentual não acompanha o aumento do custo de vida.",
+        "Segundo dados citados pela Deutsche Welle, os salários dos professores no México variam de forma significativa conforme a carga horária e o tipo de contrato.",
+        "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional. No entanto, o salário inicial fica entre R$ 2,4 mil e R$ 4,2 mil, e muitos profissionais acabam recebendo menos devido a contratos parciais. Na prática, o rendimento médio de entrada no magistério gira em torno de R$ 2 mil.",
+        "Além da pauta salarial, os professores criticam políticas educacionais do governo e regras previdenciárias.",
+        "Já o SNTE defende um reajuste de 13% para 2026, argumentando que a inflação tem reduzido o poder de compra da categoria.",
+        "A proximidade da Copa transformou as reivindicações em uma questão de repercussão internacional. O México espera receber cerca de 5 milhões de turistas estrangeiros durante o torneio, o que o torna uma vitrine global e amplia a visibilidade dos protestos.",
+        "Nos últimos dias, manifestantes ocuparam a fan zone montada no Zócalo, principal praça da capital, bloquearam ruas e avenidas importantes, derrubaram esculturas de jogadores instaladas para o evento e queimaram camisas gigantes em protesto.",
+        "Em algumas ações, deixaram mensagens como \"sem solução, a bola não rola\", em referência direta à competição.",
+        "A ocupação do Zócalo, que deve receber até 100 mil pessoas nos dias de jogos da seleção mexicana, também levou ao cancelamento de atividades organizadas pela Fifa, incluindo um treinamento de voluntários.",
+        "As manifestações registraram episódios de violência. Relatos da imprensa indicam confrontos entre manifestantes e forças de segurança, com uso de gás lacrimogêneo pela polícia. Um grupo também invadiu o Ministério da Educação, onde foi registrado um incêndio no hall do prédio.",
+        "A presidente Claudia Sheinbaum classificou os atos como uma \"provocação\" e afirmou que nem todos os envolvidos seriam professores, atribuindo parte da violência a grupos radicais.",
+        "Apesar disso, o governo evitou adotar uma repressão mais dura, para não expor negativamente o país sob os holofotes internacionais.",
+        "Os impactos já atingem a rotina da capital e a economia, segundo Deutsche Welle. Estimativas apontam perdas de cerca de R$ 119 milhões em razão de bloqueios, interrupções logísticas, fechamento de aeroportos e episódios de vandalismo."
+    ],
+    "blocks_bert": [
+        "A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%. A situação aumenta a tensão no país e ameaça a realização do torneio.",
+        "Bloqueios de vias estratégicas, ocupações e confrontos marcaram os últimos dias na Cidade do México. Os sindicatos da categoria aproveitam a visibilidade global do evento para pressionar o governo por reajustes salariais e mudanças nas condições de trabalho.",
+        "Nesta terça-feira (9), milhares de manifestantes interditaram uma avenida que dá acesso ao Estádio Azteca, um dos principais palcos da competição, segundo a agência AFP. O local receberá a partida de abertura da Copa do Mundo, entre México e África do Sul.",
+        "A mobilização é organizada pela Coordenadoria Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do principal sindicato da categoria.",
+        "Considerada a ala mais combativa dos professores mexicanos, a CNTE convocou uma greve nacional por tempo indeterminado em 1º de junho e, desde então, ampliou sua presença nas ruas da capital. Além dela, o Sindicato Nacional dos Trabalhadores da Educação (SNTE) também reivindica reajustes, embora adote uma postura mais moderada.",
+        "Os atos reúnem principalmente professores da educação básica, incluindo trabalhadores com contratos parciais, que representam uma parcela significativa da categoria no país.",
+        "O principal impasse está na remuneração. A CNTE exige um aumento salarial de 100%, proposta rejeitada pelo governo federal por ser considerada inviável.",
+        "A insatisfação ganhou força após o , em maio de 2025, de um reajuste de 10%, com aplicação prevista apenas para setembro de 2026. Para o sindicato, o percentual não acompanha o aumento do custo de vida.",
+        "Segundo dados citados pela Deutsche Welle, os salários dos professores no México variam de forma significativa conforme a carga horária e o tipo de contrato.",
+        "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional. No entanto, o salário inicial fica entre R$ 2,4 mil e R$ 4,2 mil, e muitos profissionais acabam recebendo menos devido a contratos parciais. Na prática, o rendimento médio de entrada no magistério gira em torno de R$ 2 mil.",
+        "Além da pauta salarial, os professores criticam políticas educacionais do governo e regras previdenciárias.",
+        "Já o SNTE defende um reajuste de 13% para 2026, argumentando que a inflação tem reduzido o poder de compra da categoria.",
+        "A proximidade da Copa transformou as reivindicações em uma questão de repercussão internacional. O México espera receber cerca de 5 milhões de turistas estrangeiros durante o torneio, o que o torna uma vitrine global e amplia a visibilidade dos protestos.",
+        "Nos últimos dias, manifestantes ocuparam a fan zone montada no Zócalo, principal praça da capital, bloquearam ruas e avenidas importantes, derrubaram esculturas de jogadores instaladas para o evento e queimaram camisas gigantes em protesto.",
+        "Em algumas ações, deixaram mensagens como \"sem solução, a bola não rola\", em referência direta à competição.",
+        "A ocupação do Zócalo, que deve receber até 100 mil pessoas nos dias de jogos da seleção mexicana, também levou ao cancelamento de atividades organizadas pela Fifa, incluindo um treinamento de voluntários.",
+        "As manifestações registraram episódios de violência. Relatos da imprensa indicam confrontos entre manifestantes e forças de segurança, com uso de gás lacrimogêneo pela polícia. Um grupo também invadiu o Ministério da Educação, onde foi registrado um incêndio no hall do prédio.",
+        "A presidente Claudia Sheinbaum classificou os atos como uma \"provocação\" e afirmou que nem todos os envolvidos seriam professores, atribuindo parte da violência a grupos radicais.",
+        "Apesar disso, o governo evitou adotar uma repressão mais dura, para não expor negativamente o país sob os holofotes internacionais.",
+        "Os impactos já atingem a rotina da capital e a economia, segundo Deutsche Welle. Estimativas apontam perdas de cerca de R$ 119 milhões em razão de bloqueios, interrupções logísticas, fechamento de aeroportos e episódios de vandalismo."
+    ],
+    "blocks_tfidf": [
+        "pouco hora abertura copa mundo marcar quinta-feira mexico enfrentar escalada protesto liderar professor pedir aumento salarial ate situacao aumentar tensao pai ameacar realizacao torneio",
+        "bloqueio via estrategico ocupacoes confronto marcar ultimo dia cidade mexico sindicato categoria aproveitar visibilidade global evento pressionar governo reajuste salarial mudanco condicoe trabalho",
+        "terca-feira milhar manifestante interditar avenida acesso estadio azteco principal palco competicao agencia afp receber partida abertura copa mundo mexico africo Sul",
+        "mobilizacao organizar coordenadoria nacional trabalhador educacao cnte dissidente principal sindicato categoria",
+        "considerar alar combativo professor mexicano cnte convocar greve nacional indeterminar junho entao ampliar presenca rua capital aler de ela sindicato nacional trabalhador educacao snte tambem reivindico reajuste adotar postura moderar",
+        "ato reunem principalmente professor educacao basico incluir trabalhador contrato parcial representar parcela significativo categoria pai",
+        "principal impasse remuneracao cnte exigir aumento salarial proposta rejeitar governo federal considerar inviavel",
+        "insatisfacao ganhar forca apo maio reajuste aplicacao prever setembro sindicato percentual nao acompanhar aumento custo vida",
+        "dado citar deutsche Welle salario professor mexico variar significativo carga horario contrato",
+        "media remuneracao chegar cerca mes considerar acima media nacional entanto salario inicial ficar profissional acabar receber devido contrato parcial pratica rendimento medio entrada magisterio gira torno",
+        "aler pauta salarial professor criticar politica educacional governo regra previdenciario",
+        "je a snte defender reajuste argumentar inflacao reduzir compra categoria",
+        "proximidade copa transformar reivindicacoe questao repercussao internacional mexico esperar receber cerca turista estrangeiro durante torneio tornar vitrine global ampliar visibilidade protesto",
+        "ultimo dia manifestante ocupar fan zone montar zocalo principal praca capital bloquear rua avenida importante derrubar escultura jogador instalar evento queimar camisa gigante protesto",
+        "acoes deixar mensagem solucao bola nao rolar referencia direto competicao",
+        "ocupacao zocalo receber ate pessoa dia jogo selecao mexicano tamber levar cancelamento atividade organizar fifa incluir treinamento voluntario",
+        "manifestacoes registrar episodio violencia relato imprensa indicar confronto manifestante forca seguranca uso lacrimogeneo policia tambem invadir ministerio educacao registrar incendio hall predio",
+        "presidente claudiar sheinbaum classificar ato provocacao envolvido ser professor atribuir violencia grupo radical",
+        "apesar governo evitar adotar repressao duro nao expor negativamente pai holofote internacional",
+        "impacto atingir rotina capital economia deutsche welle estimativa apontar perda cerca razao bloqueio interrupcoes logistico fechamento aeroporto episodio vandalismo"
+    ],
+    "blocks_similarity": [
+        "poucas horas da abertura da copa do mundo de marcada para esta quinta-feira mexico enfrenta uma escalada de protestos liderados por professores que pedem aumentos salariais de ate situacao aumenta tensao no pais ameaca realizacao do torneio",
+        "bloqueios de vias estrategicas ocupacoes confrontos marcaram os ultimos dias na cidade do mexico os sindicatos da categoria aproveitam visibilidade global do evento para pressionar governo por reajustes salariais mudancas nas condicoes de trabalho",
+        "nesta terca-feira milhares de manifestantes interditaram uma avenida que da acesso ao estadio azteca dos principais palcos da competicao agencia afp local recebera partida de abertura da copa do mundo entre mexico africa do sul",
+        "mobilizacao organizada pela coordenadoria nacional dos trabalhadores da educacao cnte grupo dissidente do principal sindicato da categoria",
+        "considerada ala mais combativa dos professores mexicanos cnte convocou uma greve nacional por tempo indeterminado em de junho desde entao ampliou sua presenca nas ruas da capital alem dela sindicato nacional dos trabalhadores da educacao snte tambem reivindica reajustes embora adote uma postura mais moderada",
+        "os atos reunem principalmente professores da educacao basica incluindo trabalhadores com contratos parciais que representam uma parcela significativa da categoria no pais",
+        "principal impasse esta na remuneracao cnte exige aumento salarial de proposta rejeitada pelo governo federal por ser considerada inviavel",
+        "insatisfacao ganhou forca apos em maio de de reajuste de com aplicacao prevista apenas para setembro de para sindicato percentual nao acompanha aumento do custo de vida",
+        "dados citados pela deutsche welle os salarios dos professores no mexico variam de forma significativa conforme carga horaria tipo de contrato",
+        "em media remuneracao pode chegar cerca de r$ por mes valor considerado acima da media nacional no entanto salario inicial fica entre r$ r$ muitos profissionais acabam recebendo menos devido contratos parciais na pratica rendimento medio de entrada no magisterio gira em torno de r$",
+        "alem da pauta salarial os professores criticam politicas educacionais do governo regras previdenciarias",
+        "ja snte defende reajuste de para argumentando que inflacao tem reduzido poder de compra da categoria",
+        "proximidade da copa transformou as reivindicacoes em uma questao de repercussao internacional mexico espera receber cerca de de turistas estrangeiros durante torneio que torna uma vitrine global amplia visibilidade dos protestos",
+        "nos ultimos dias manifestantes ocuparam fan zone montada no zocalo principal praca da capital bloquearam ruas avenidas importantes derrubaram esculturas de jogadores instaladas para evento queimaram camisas gigantes em protesto",
+        "em algumas acoes deixaram mensagens como sem solucao bola nao rola em referencia direta competicao",
+        "ocupacao do zocalo que deve receber ate pessoas nos dias de jogos da selecao mexicana tambem levou ao cancelamento de atividades organizadas pela fifa incluindo treinamento de voluntarios",
+        "as manifestacoes registraram episodios de violencia relatos da imprensa indicam confrontos entre manifestantes forcas de seguranca com uso de gas lacrimogeneo pela policia grupo tambem invadiu ministerio da educacao onde foi registrado incendio no hall do predio",
+        "presidente claudia sheinbaum classificou os atos como uma provocacao afirmou que nem todos os envolvidos seriam professores atribuindo parte da violencia grupos radicais",
+        "apesar disso governo evitou adotar uma repressao mais dura para nao expor negativamente pais sob os holofotes internacionais",
+        "os impactos ja atingem rotina da capital economia deutsche welle estimativas apontam perdas de cerca de r$ em razao de bloqueios interrupcoes logisticas fechamento de aeroportos episodios de vandalismo"
+    ],
+    "sentence_texts": null,
+    "segment_texts": null,
+    "segmentation_stats": {
+        "blocks_processed": 20,
+        "blocks_skipped": 0,
+        "sentence_count": 32,
+        "segment_count": 19,
+        "total_token_count": 643,
+        "avg_tokens_per_sent": 20.1,
+        "avg_sent_per_block": 1.6,
+        "by_block": [
+            {
+                "sentence_count": 2,
+                "token_count": 46,
+                "avg_tokens_per_sent": 23.0,
+                "min_sent_tokens": 13,
+                "max_sent_tokens": 33,
+                "block_index": 0,
+                "skipped": false
+            },
+            {
+                "sentence_count": 2,
+                "token_count": 38,
+                "avg_tokens_per_sent": 19.0,
+                "min_sent_tokens": 15,
+                "max_sent_tokens": 23,
+                "block_index": 1,
+                "skipped": false
+            },
+            {
+                "sentence_count": 2,
+                "token_count": 42,
+                "avg_tokens_per_sent": 21.0,
+                "min_sent_tokens": 17,
+                "max_sent_tokens": 25,
+                "block_index": 2,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 19,
+                "avg_tokens_per_sent": 19.0,
+                "min_sent_tokens": 19,
+                "max_sent_tokens": 19,
+                "block_index": 3,
+                "skipped": false
+            },
+            {
+                "sentence_count": 2,
+                "token_count": 50,
+                "avg_tokens_per_sent": 25.0,
+                "min_sent_tokens": 19,
+                "max_sent_tokens": 31,
+                "block_index": 4,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 22,
+                "avg_tokens_per_sent": 22.0,
+                "min_sent_tokens": 22,
+                "max_sent_tokens": 22,
+                "block_index": 5,
+                "skipped": false
+            },
+            {
+                "sentence_count": 2,
+                "token_count": 23,
+                "avg_tokens_per_sent": 11.5,
+                "min_sent_tokens": 6,
+                "max_sent_tokens": 17,
+                "block_index": 6,
+                "skipped": false
+            },
+            {
+                "sentence_count": 2,
+                "token_count": 36,
+                "avg_tokens_per_sent": 18.0,
+                "min_sent_tokens": 13,
+                "max_sent_tokens": 23,
+                "block_index": 7,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 25,
+                "avg_tokens_per_sent": 25.0,
+                "min_sent_tokens": 25,
+                "max_sent_tokens": 25,
+                "block_index": 8,
+                "skipped": false
+            },
+            {
+                "sentence_count": 3,
+                "token_count": 60,
+                "avg_tokens_per_sent": 20.0,
+                "min_sent_tokens": 16,
+                "max_sent_tokens": 24,
+                "block_index": 9,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 14,
+                "avg_tokens_per_sent": 14.0,
+                "min_sent_tokens": 14,
+                "max_sent_tokens": 14,
+                "block_index": 10,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 22,
+                "avg_tokens_per_sent": 22.0,
+                "min_sent_tokens": 22,
+                "max_sent_tokens": 22,
+                "block_index": 11,
+                "skipped": false
+            },
+            {
+                "sentence_count": 2,
+                "token_count": 40,
+                "avg_tokens_per_sent": 20.0,
+                "min_sent_tokens": 13,
+                "max_sent_tokens": 27,
+                "block_index": 12,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 34,
+                "avg_tokens_per_sent": 34.0,
+                "min_sent_tokens": 34,
+                "max_sent_tokens": 34,
+                "block_index": 13,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 17,
+                "avg_tokens_per_sent": 17.0,
+                "min_sent_tokens": 17,
+                "max_sent_tokens": 17,
+                "block_index": 14,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 32,
+                "avg_tokens_per_sent": 32.0,
+                "min_sent_tokens": 32,
+                "max_sent_tokens": 32,
+                "block_index": 15,
+                "skipped": false
+            },
+            {
+                "sentence_count": 3,
+                "token_count": 41,
+                "avg_tokens_per_sent": 13.7,
+                "min_sent_tokens": 6,
+                "max_sent_tokens": 18,
+                "block_index": 16,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 26,
+                "avg_tokens_per_sent": 26.0,
+                "min_sent_tokens": 26,
+                "max_sent_tokens": 26,
+                "block_index": 17,
+                "skipped": false
+            },
+            {
+                "sentence_count": 1,
+                "token_count": 20,
+                "avg_tokens_per_sent": 20.0,
+                "min_sent_tokens": 20,
+                "max_sent_tokens": 20,
+                "block_index": 18,
+                "skipped": false
+            },
+            {
+                "sentence_count": 2,
+                "token_count": 36,
+                "avg_tokens_per_sent": 18.0,
+                "min_sent_tokens": 14,
+                "max_sent_tokens": 22,
+                "block_index": 19,
+                "skipped": false
+            }
+        ]
+    },
+    "claim_count": 20,
+    "claims": [
+        {
+            "claim_id": "f68413d5",
+            "text": "Nesta terça-feira (9), milhares de manifestantes interditaram uma avenida que dá acesso ao Estádio Azteca, um dos principais palcos da competição, segundo a agência AFP.",
+            "normalized": "nesta terça feira milhares manifestantes interditaram avenida dá acesso ao estádio azteca principais palcos competição agência afp",
+            "entities": [
+                "Estádio Azteca"
+            ],
+            "subject": "Estádio Azteca",
+            "confidence": 0.8,
+            "has_numbers": true,
+            "keywords": [
+                "nesta",
+                "terça",
+                "feira",
+                "milhares",
+                "manifestantes",
+                "interditaram",
+                "avenida",
+                "acesso"
+            ]
+        },
+        {
+            "claim_id": "e806bdee",
+            "text": "Segundo dados citados pela Deutsche Welle, os salários dos professores no México variam de forma significativa conforme a carga horária e o tipo de contrato.",
+            "normalized": "dados citados pela deutsche welle salários professores méxico variam forma significativa conforme carga horária tipo contrato",
+            "entities": [
+                "Deutsche Welle",
+                "México"
+            ],
+            "subject": "Deutsche Welle",
+            "confidence": 0.7,
+            "has_numbers": false,
+            "keywords": [
+                "dados",
+                "citados",
+                "pela",
+                "deutsche",
+                "welle",
+                "salários",
+                "professores",
+                "méxico"
+            ]
+        },
+        {
+            "claim_id": "50041e59",
+            "text": "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional.",
+            "normalized": "média remuneração pode chegar cerca mil mês valor considerado acima média nacional",
+            "entities": [],
+            "subject": "média",
+            "confidence": 0.7,
+            "has_numbers": true,
+            "keywords": [
+                "média",
+                "remuneração",
+                "pode",
+                "chegar",
+                "cerca",
+                "valor",
+                "considerado",
+                "acima"
+            ]
+        },
+        {
+            "claim_id": "6e776115",
+            "text": "No entanto, o salário inicial fica entre R$ 2,4 mil e R$ 4,2 mil, e muitos profissionais acabam recebendo menos devido a contratos parciais.",
+            "normalized": "entanto salário inicial fica entre mil mil muitos profissionais acabam recebendo devido contratos parciais",
+            "entities": [],
+            "subject": "entanto",
+            "confidence": 0.7,
+            "has_numbers": true,
+            "keywords": [
+                "entanto",
+                "salário",
+                "inicial",
+                "fica",
+                "entre",
+                "muitos",
+                "profissionais",
+                "acabam"
+            ]
+        },
+        {
+            "claim_id": "ccb6e9f0",
+            "text": "A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%.",
+            "normalized": "poucas horas abertura copa mundo 2026 marcada quinta feira 11 méxico enfrenta escalada protestos liderados professores pedem aumentos salariais até 100",
+            "entities": [
+                "México"
+            ],
+            "subject": "México",
+            "confidence": 0.6,
+            "has_numbers": true,
+            "keywords": [
+                "poucas",
+                "horas",
+                "abertura",
+                "copa",
+                "mundo",
+                "2026",
+                "marcada",
+                "quinta"
+            ]
+        },
+        {
+            "claim_id": "debe8d30",
+            "text": "A CNTE exige um aumento salarial de 100%, proposta rejeitada pelo governo federal por ser considerada inviável.",
+            "normalized": "cnte exige aumento salarial 100 proposta rejeitada pelo governo federal ser considerada inviável",
+            "entities": [
+                "CNTE"
+            ],
+            "subject": "CNTE",
+            "confidence": 0.6,
+            "has_numbers": true,
+            "keywords": [
+                "cnte",
+                "exige",
+                "aumento",
+                "salarial",
+                "proposta",
+                "rejeitada",
+                "pelo",
+                "governo"
+            ]
+        },
+        {
+            "claim_id": "f85ca071",
+            "text": "O local receberá a partida de abertura da Copa do Mundo, entre México e África do Sul.",
+            "normalized": "local receberá partida abertura copa do mundo entre méxico áfrica do sul",
+            "entities": [
+                "México",
+                "África do Sul"
+            ],
+            "subject": "México",
+            "confidence": 0.5,
+            "has_numbers": false,
+            "keywords": [
+                "local",
+                "receberá",
+                "partida",
+                "abertura",
+                "copa",
+                "mundo",
+                "entre",
+                "méxico"
+            ]
+        },
+        {
+            "claim_id": "feb4dbf1",
+            "text": "A insatisfação ganhou força após o , em maio de 2025, de um reajuste de 10%, com aplicação prevista apenas para setembro de 2026.",
+            "normalized": "insatisfação ganhou força após maio 2025 reajuste 10 aplicação prevista apenas setembro 2026",
+            "entities": [],
+            "subject": "insatisfação",
+            "confidence": 0.5,
+            "has_numbers": true,
+            "keywords": [
+                "insatisfação",
+                "ganhou",
+                "força",
+                "após",
+                "maio",
+                "2025",
+                "reajuste",
+                "aplicação"
+            ]
+        },
+        {
+            "claim_id": "8596a09c",
+            "text": "Na prática, o rendimento médio de entrada no magistério gira em torno de R$ 2 mil.",
+            "normalized": "prática rendimento médio entrada magistério gira torno mil",
+            "entities": [],
+            "subject": "prática",
+            "confidence": 0.5,
+            "has_numbers": true,
+            "keywords": [
+                "prática",
+                "rendimento",
+                "médio",
+                "entrada",
+                "magistério",
+                "gira",
+                "torno"
+            ]
+        },
+        {
+            "claim_id": "dc9c0275",
+            "text": "Já o SNTE defende um reajuste de 13% para 2026, argumentando que a inflação tem reduzido o poder de compra da categoria.",
+            "normalized": "snte defende reajuste 13 2026 argumentando inflação tem reduzido poder compra categoria",
+            "entities": [],
+            "subject": "SNTE",
+            "confidence": 0.5,
+            "has_numbers": true,
+            "keywords": [
+                "snte",
+                "defende",
+                "reajuste",
+                "2026",
+                "argumentando",
+                "inflação",
+                "reduzido",
+                "poder"
+            ]
+        },
+        {
+            "claim_id": "5d39924d",
+            "text": "Bloqueios de vias estratégicas, ocupações e confrontos marcaram os últimos dias na Cidade do México.",
+            "normalized": "bloqueios vias estratégicas ocupações confrontos marcaram últimos dias cidade do méxico",
+            "entities": [
+                "Cidade do México"
+            ],
+            "subject": "Cidade do México",
+            "confidence": 0.4,
+            "has_numbers": false,
+            "keywords": [
+                "bloqueios",
+                "vias",
+                "estratégicas",
+                "ocupações",
+                "confrontos",
+                "marcaram",
+                "últimos",
+                "dias"
+            ]
+        },
+        {
+            "claim_id": "949361a6",
+            "text": "Considerada a ala mais combativa dos professores mexicanos, a CNTE convocou uma greve nacional por tempo indeterminado em 1º de junho e, desde então, ampliou sua presença nas ruas da capital.",
+            "normalized": "considerada ala combativa professores mexicanos cnte convocou greve nacional tempo indeterminado 1º junho desde então ampliou sua presença ruas capital",
+            "entities": [
+                "CNTE"
+            ],
+            "subject": "CNTE",
+            "confidence": 0.4,
+            "has_numbers": false,
+            "keywords": [
+                "considerada",
+                "combativa",
+                "professores",
+                "mexicanos",
+                "cnte",
+                "convocou",
+                "greve",
+                "nacional"
+            ]
+        },
+        {
+            "claim_id": "4193ad64",
+            "text": "A situação aumenta a tensão no país e ameaça a realização do torneio.",
+            "normalized": "situação aumenta tensão país ameaça realização torneio",
+            "entities": [],
+            "subject": "situação",
+            "confidence": 0.3,
+            "has_numbers": false,
+            "keywords": [
+                "situação",
+                "aumenta",
+                "tensão",
+                "país",
+                "ameaça",
+                "realização",
+                "torneio"
+            ]
+        },
+        {
+            "claim_id": "36fec2b2",
+            "text": "Os sindicatos da categoria aproveitam a visibilidade global do evento para pressionar o governo por reajustes salariais e mudanças nas condições de trabalho.",
+            "normalized": "sindicatos categoria aproveitam visibilidade global evento pressionar governo reajustes salariais mudanças condições trabalho",
+            "entities": [],
+            "subject": "sindicatos",
+            "confidence": 0.3,
+            "has_numbers": false,
+            "keywords": [
+                "sindicatos",
+                "categoria",
+                "aproveitam",
+                "visibilidade",
+                "global",
+                "evento",
+                "pressionar",
+                "governo"
+            ]
+        },
+        {
+            "claim_id": "ea3870a3",
+            "text": "A mobilização é organizada pela Coordenadoria Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do principal sindicato da categoria.",
+            "normalized": "mobilização organizada pela coordenadoria nacional dos trabalhadores da educação cnte grupo dissidente principal sindicato da categoria",
+            "entities": [
+                "Coordenadoria Nacional dos Trabalhadores da Educação",
+                "CNTE"
+            ],
+            "subject": "Coordenadoria Nacional dos Trabalhadores da Educação",
+            "confidence": 0.3,
+            "has_numbers": false,
+            "keywords": [
+                "mobilização",
+                "organizada",
+                "pela",
+                "coordenadoria",
+                "nacional",
+                "trabalhadores",
+                "educação",
+                "cnte"
+            ]
+        },
+        {
+            "claim_id": "dcfc17d9",
+            "text": "Além dela, o Sindicato Nacional dos Trabalhadores da Educação (SNTE) também reivindica reajustes, embora adote uma postura mais moderada.",
+            "normalized": "dela sindicato nacional trabalhadores educação snte reivindica reajustes embora adote postura moderada",
+            "entities": [],
+            "subject": "Sindicato",
+            "confidence": 0.3,
+            "has_numbers": false,
+            "keywords": [
+                "dela",
+                "sindicato",
+                "nacional",
+                "trabalhadores",
+                "educação",
+                "snte",
+                "reivindica",
+                "reajustes"
+            ]
+        },
+        {
+            "claim_id": "cfd9be9d",
+            "text": "Os atos reúnem principalmente professores da educação básica, incluindo trabalhadores com contratos parciais, que representam uma parcela significativa da categoria no país.",
+            "normalized": "atos reúnem principalmente professores educação básica incluindo trabalhadores contratos parciais representam parcela significativa categoria país",
+            "entities": [],
+            "subject": "atos",
+            "confidence": 0.3,
+            "has_numbers": false,
+            "keywords": [
+                "atos",
+                "reúnem",
+                "principalmente",
+                "professores",
+                "educação",
+                "básica",
+                "incluindo",
+                "trabalhadores"
+            ]
+        },
+        {
+            "claim_id": "db9f408e",
+            "text": "Para o sindicato, o percentual não acompanha o aumento do custo de vida.",
+            "normalized": "sindicato percentual acompanha aumento custo vida",
+            "entities": [],
+            "subject": "sindicato",
+            "confidence": 0.3,
+            "has_numbers": false,
+            "keywords": [
+                "sindicato",
+                "percentual",
+                "acompanha",
+                "aumento",
+                "custo",
+                "vida"
+            ]
+        },
+        {
+            "claim_id": "9447baa4",
+            "text": "Além da pauta salarial, os professores criticam políticas educacionais do governo e regras previdenciárias.",
+            "normalized": "pauta salarial professores criticam políticas educacionais governo regras previdenciárias",
+            "entities": [],
+            "subject": "pauta",
+            "confidence": 0.3,
+            "has_numbers": false,
+            "keywords": [
+                "pauta",
+                "salarial",
+                "professores",
+                "criticam",
+                "políticas",
+                "educacionais",
+                "governo",
+                "regras"
+            ]
+        },
+        {
+            "claim_id": "50a2d7ff",
+            "text": "A proximidade da Copa transformou as reivindicações em uma questão de repercussão internacional.",
+            "normalized": "proximidade copa transformou reivindicações questão repercussão internacional",
+            "entities": [],
+            "subject": "proximidade",
+            "confidence": 0.3,
+            "has_numbers": false,
+            "keywords": [
+                "proximidade",
+                "copa",
+                "transformou",
+                "reivindicações",
+                "questão",
+                "repercussão",
+                "internacional"
+            ]
+        }
+    ],
+    "claim_stats": {
+        "sentences_processed": 21,
+        "claims_found": 20,
+        "discarded_opinion": 0,
+        "discarded_rhetorical": 0,
+        "discarded_noise": 1,
+        "checkability_rate": 0.952,
+        "avg_confidence": 0.465,
+        "claims_with_entities": 8,
+        "claims_with_numbers": 8
+    },
+    "evidence_count": 32,
+    "retrieval_results": [
+        {
+            "claim_id": "f68413d5",
+            "claim_text": "Nesta terça-feira (9), milhares de manifestantes interditaram uma avenida que dá acesso ao Estádio Azteca, um dos principais palcos da competição, segundo a agência AFP.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "wikipedia",
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes"
+            },
+            "retrieval_time": 4.143,
+            "evidences": [
+                {
+                    "evidence_id": "97c6c4fbda0b0682",
+                    "text": "Manifestantes fecham avenida que dá acesso a estádio da Copa no México | G1. <strong>Milhares de manifestantes bloquearam uma avenida que leva ao Estádio Azteca, na Cidade do México, nesta terça-feira (9), em protestos a 48 horas da Copa do Mundo de 2026</strong>, segundo a agência de notícias AFP.",
+                    "source": "g1.globo.com",
+                    "title": "Manifestantes fecham avenida que dá acesso a estádio da Copa no México | G1",
+                    "url": "https://g1.globo.com/mundo/noticia/2026/06/09/milhares-de-manifestantes-fecham-avenida-que-da-acesso-a-estadio-da-copa-no-mexico.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Nesta terça-feira (9), milhares de manifestantes interditaram uma avenida que dá acesso ao Estádio Azteca, um dos principais palcos da competição, segundo a agência AFP. Estádio Azteca",
+                        "snippet": "<strong>Milhares de manifestantes bloquearam uma avenida que leva ao Estádio Azteca, na Cidade do México, nesta terça-feira (9), em protestos a 48 horas da Copa do Mundo de 2026</strong>, segundo a agência de notícias AFP.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "dc0b02b15138b8d6",
+                    "text": "O Estadio Azteca, oficialmente conhecido como Estadio Banorte por questões de patrocínio, é um estádio de futebol localizado na Cidade do México, no México. É o maior estádio do país e é a casa da Seleção Mexicana de Futebol e de clubes como o Club América. Também já sediou partidas do Cruz Azul do Necaxa entre outros.",
+                    "source": "Wikipedia",
+                    "title": "Estádio Azteca",
+                    "url": "https://pt.wikipedia.org/wiki/Est%C3%A1dio_Azteca",
+                    "domain": "pt.wikipedia.org",
+                    "similarity": 0.1333,
+                    "published_at": null,
+                    "retrieval_layer": "wikipedia",
+                    "source_type": "encyclopedia",
+                    "trusted_source": false,
+                    "stance": null,
+                    "metadata": {
+                        "title": "Estádio Azteca",
+                        "description": "",
+                        "lang": "pt",
+                        "source": "pt.wikipedia.org",
+                        "query": "Estádio Azteca"
+                    }
+                },
+                {
+                    "evidence_id": "2bf96be9dde49c6c",
+                    "text": "O Estádio Asteras Tripolis é um estadio de futebol sediado, em Tripoli, Grécia, pertence ao Asteras Tripolis, clube da principal divisão do futebol grego, está a 160km de distância de Atenas.",
+                    "source": "Wikipedia",
+                    "title": "Estádio Asteras Tripolis",
+                    "url": "https://pt.wikipedia.org/wiki/Est%C3%A1dio_Asteras_Tripolis",
+                    "domain": "pt.wikipedia.org",
+                    "similarity": 0.0667,
+                    "published_at": null,
+                    "retrieval_layer": "wikipedia",
+                    "source_type": "encyclopedia",
+                    "trusted_source": false,
+                    "stance": null,
+                    "metadata": {
+                        "title": "Estádio Asteras Tripolis",
+                        "description": "",
+                        "lang": "pt",
+                        "source": "pt.wikipedia.org",
+                        "query": "Estádio Azteca"
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "e806bdee",
+            "claim_text": "Segundo dados citados pela Deutsche Welle, os salários dos professores no México variam de forma significativa conforme a carga horária e o tipo de contrato.",
+            "rag_score": 0.125,
+            "layers_used": [
+                "wikipedia"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "web_search": "sem resultados relevantes"
+            },
+            "retrieval_time": 14.036,
+            "evidences": [
+                {
+                    "evidence_id": "8d4cc77054e8c3e9",
+                    "text": "Deutsche Welle (DW) é uma empresa pública de radiodifusão da Alemanha, com sedes em Bonn e Berlim, que transmite para o exterior programas de rádio, além de oferecer uma programação televisiva e um amplo portal de conteúdo online em 30 línguas. É o equivalente alemão a redes de notícias como a BBC World, por exemplo, e é membro da rede pública de televisão ARD. Seu slogan é: Aus der Mitte Europas. É a 10.ª maior emissora do mundo.",
+                    "source": "Wikipedia",
+                    "title": "Deutsche Welle",
+                    "url": "https://pt.wikipedia.org/wiki/Deutsche_Welle",
+                    "domain": "pt.wikipedia.org",
+                    "similarity": 0.125,
+                    "published_at": null,
+                    "retrieval_layer": "wikipedia",
+                    "source_type": "encyclopedia",
+                    "trusted_source": false,
+                    "stance": null,
+                    "metadata": {
+                        "title": "Deutsche Welle",
+                        "description": "Empresa pública alemã de radiodifusão internacional, fundada em 1953",
+                        "lang": "pt",
+                        "source": "pt.wikipedia.org",
+                        "query": "Deutsche Welle"
+                    }
+                },
+                {
+                    "evidence_id": "0a39521c5f3f64bc",
+                    "text": "México, oficialmente Estados Unidos Mexicanos, é uma república constitucional federal localizada na América do Norte. O país é limitado a norte pelos Estados Unidos; ao sul e oeste pelo Oceano Pacífico; a sudeste pela Guatemala, Belize e Mar do Caribe; a leste pelo Golfo do México. Com um território que abrange quase 2 milhões de quilômetros quadrados, o México é o quinto maior país da América por área total e o 14.º maior país independente do mundo. Com uma população estimada para 2020 de 126 milhões de habitantes, é o 11.º país mais populoso do mundo e o mais populoso país da hispanofonia. O México é uma federação composta por 31 estados e a Cidade do México (capital). O México figura também como o segundo país mais populoso e segundo em PIB da América Latina, em ambos os casos superado ...",
+                    "source": "Wikipedia",
+                    "title": "México",
+                    "url": "https://pt.wikipedia.org/wiki/M%C3%A9xico",
+                    "domain": "pt.wikipedia.org",
+                    "similarity": 0.125,
+                    "published_at": null,
+                    "retrieval_layer": "wikipedia",
+                    "source_type": "encyclopedia",
+                    "trusted_source": false,
+                    "stance": null,
+                    "metadata": {
+                        "title": "México",
+                        "description": "país na América do Norte",
+                        "lang": "pt",
+                        "source": "pt.wikipedia.org",
+                        "query": "México"
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "50041e59",
+            "claim_text": "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.221,
+            "evidences": [
+                {
+                    "evidence_id": "8bfe9097c415d429",
+                    "text": "Você está entre os mais ricos do Brasil? Veja quanto é preciso ganhar para entrar no topo da renda | G1. Segundo Fontes, esse avanço ajuda ... aparece um dos dados que mais costumam surpreender: <strong>os 10% mais ricos do Brasil tiveram rendimento médio R$ 3.590 por pessoa em 2025</strong>....",
+                    "source": "g1.globo.com",
+                    "title": "Você está entre os mais ricos do Brasil? Veja quanto é preciso ganhar para entrar no topo da renda | G1",
+                    "url": "https://g1.globo.com/economia/noticia/2026/05/08/veja-quanto-e-preciso-ganhar-para-entrar-no-topo-da-renda.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional.",
+                        "snippet": "Segundo Fontes, esse avanço ajuda ... aparece um dos dados que mais costumam surpreender: <strong>os 10% mais ricos do Brasil tiveram rendimento médio R$ 3.590 por pessoa em 2025</strong>....",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "934182fb860e836c",
+                    "text": "Salários acima de R$ 6 mil já pagam mais imposto do que milionários, diz estudo | G1. <strong>Trabalhadores que recebem acima de R$ 6 mil por mês já pagam mais Imposto de Renda do que milionários no Brasil</strong>, segundo estudo do Sindicato Nacional dos Auditores-Fiscais da Receita Federal (Sindifisco).",
+                    "source": "g1.globo.com",
+                    "title": "Salários acima de R$ 6 mil já pagam mais imposto do que milionários, diz estudo | G1",
+                    "url": "https://g1.globo.com/economia/noticia/2025/09/08/salarios-acima-de-r-6-mil-ja-pagam-mais-imposto-do-que-milionarios-diz-estudo.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional.",
+                        "snippet": "<strong>Trabalhadores que recebem acima de R$ 6 mil por mês já pagam mais Imposto de Renda do que milionários no Brasil</strong>, segundo estudo do Sindicato Nacional dos Auditores-Fiscais da Receita Federal (Sindifisco).",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "31912bf8cc723046",
+                    "text": "Renda dos brasileiros varia mais que o dobro entre estados, diz IBGE | G1. São funções que exigem alta qualificação ou oferecem estabilidade, fatores que contribuem para os salários elevados. <strong>Os técnicos e profissionais de nível médio registram rendimento de R$ 4.148, aproximadamente 29% acima da média nacional</strong>.",
+                    "source": "g1.globo.com",
+                    "title": "Renda dos brasileiros varia mais que o dobro entre estados, diz IBGE | G1",
+                    "url": "https://g1.globo.com/trabalho-e-carreira/noticia/2025/12/03/rendimento-ibge.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional.",
+                        "snippet": "São funções que exigem alta qualificação ou oferecem estabilidade, fatores que contribuem para os salários elevados. <strong>Os técnicos e profissionais de nível médio registram rendimento de R$ 4.148, aproximadamente 29% acima da média nacional</strong>.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "2daf7af4c186faa2",
+                    "text": "Salário médio do trabalhador amplia recorde e chega a R$ 3.722 | Agência Brasil. <strong>O trimestre encerrado em março é o segundo consecutivo em que o salário médio supera a casa dos R$ 3,7 mil</strong>. No período de três meses terminado em fevereiro, o rendimento foi de R$ 3.702.",
+                    "source": "agenciabrasil.ebc.com.br",
+                    "title": "Salário médio do trabalhador amplia recorde e chega a R$ 3.722 | Agência Brasil",
+                    "url": "https://agenciabrasil.ebc.com.br/economia/noticia/2026-04/salario-medio-do-trabalhador-amplia-recorde-e-chega-r-3722",
+                    "domain": "agenciabrasil.ebc.com.br",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional.",
+                        "snippet": "<strong>O trimestre encerrado em março é o segundo consecutivo em que o salário médio supera a casa dos R$ 3,7 mil</strong>. No período de três meses terminado em fevereiro, o rendimento foi de R$ 3.702.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "3d018418a513db50",
+                    "text": "Quanto você precisa ganhar por mês para ser considerado rico no Brasil? - Estadão. O dado mais relevante talvez seja este: <strong>no Brasil, ser considerado “rico” não exige milhões, mas sim estar acima da média</strong>. Ao ganhar pouco mais de R$ 1.700 por pessoa em casa já coloca você entre os 30% mais ricos.",
+                    "source": "estadao.com.br",
+                    "title": "Quanto você precisa ganhar por mês para ser considerado rico no Brasil? - Estadão",
+                    "url": "https://www.estadao.com.br/amp/einvestidor/radar/quanto-voce-precisa-ganhar-para-ser-considerado-rico-brasil/",
+                    "domain": "estadao.com.br",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional.",
+                        "snippet": "O dado mais relevante talvez seja este: <strong>no Brasil, ser considerado “rico” não exige milhões, mas sim estar acima da média</strong>. Ao ganhar pouco mais de R$ 1.700 por pessoa em casa já coloca você entre os 30% mais ricos.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "80d709a837c60e23",
+                    "text": "Fim da escala 6x1: Quem ganha acima de R$ 21 mil por mês não terá mais controle de jornada; entenda. A PEC propõe que os trabalhadores ... máximo dos benefícios do Regime Geral de Previdência Social”, ou <strong>R$ 21.188 por mês na tabela deste ano</strong>, “as regras relativas à duração do trabalho e ao controle da ...",
+                    "source": "oglobo.globo.com",
+                    "title": "Fim da escala 6x1: Quem ganha acima de R$ 21 mil por mês não terá mais controle de jornada; entenda",
+                    "url": "https://oglobo.globo.com/economia/noticia/2026/05/28/fim-da-escala-6x1-como-ficam-as-regras-para-quem-ganha-acima-de-r-21-mil-por-mes.ghtml",
+                    "domain": "oglobo.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Em média, a remuneração pode chegar a cerca de R$ 6 mil por mês, valor considerado acima da média nacional.",
+                        "snippet": "A PEC propõe que os trabalhadores ... máximo dos benefícios do Regime Geral de Previdência Social”, ou <strong>R$ 21.188 por mês na tabela deste ano</strong>, “as regras relativas à duração do trabalho e ao controle da ...",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "6e776115",
+            "claim_text": "No entanto, o salário inicial fica entre R$ 2,4 mil e R$ 4,2 mil, e muitos profissionais acabam recebendo menos devido a contratos parciais.",
+            "rag_score": 0.0,
+            "layers_used": [],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes",
+                "web_search": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.225,
+            "evidences": []
+        },
+        {
+            "claim_id": "ccb6e9f0",
+            "claim_text": "A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "wikipedia",
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes"
+            },
+            "retrieval_time": 3.516,
+            "evidences": [
+                {
+                    "evidence_id": "f6e534c108022539",
+                    "text": "Presidente do México enfrenta protestos de milhares de professores a dois dias da abertura da Copa do Mundo 2026. <strong>A presidente do México, Claudia Sheinbaum, enfrenta protestos de milhares de professores a dois dias da abertura da Copa do Mundo 2026</strong>. As manifestações, lideradas pela CNTE, bloquearam acessos ao Estádio Azteca e levantaram dúvidas sobre ...",
+                    "source": "oglobo.globo.com",
+                    "title": "Presidente do México enfrenta protestos de milhares de professores a dois dias da abertura da Copa do Mundo 2026",
+                    "url": "https://oglobo.globo.com/mundo/noticia/2026/06/09/presidente-do-mexico-enfrenta-protestos-de-milhares-de-professores-a-dois-dias-da-abertura-da-copa-do-mundo-2026.ghtml",
+                    "domain": "oglobo.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%. México",
+                        "snippet": "<strong>A presidente do México, Claudia Sheinbaum, enfrenta protestos de milhares de professores a dois dias da abertura da Copa do Mundo 2026</strong>. As manifestações, lideradas pela CNTE, bloquearam acessos ao Estádio Azteca e levantaram dúvidas sobre ...",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "35c099a411959958",
+                    "text": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1. A poucas horas da abertura da Copa ... professores, que pedem aumentos salariais de até 100%. <strong>A situação aumenta a tensão no país e ameaça a realização do torneio</strong>....",
+                    "source": "g1.globo.com",
+                    "title": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1",
+                    "url": "https://g1.globo.com/trabalho-e-carreira/noticia/2026/06/10/sem-solucao-a-bola-nao-rola-professores-pedem-aumento-de-100percent-em-protestos-contra-a-copa-no-mexico.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%. México",
+                        "snippet": "A poucas horas da abertura da Copa ... professores, que pedem aumentos salariais de até 100%. <strong>A situação aumenta a tensão no país e ameaça a realização do torneio</strong>....",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "94ccb3e8e10787d4",
+                    "text": "Vídeo: Sede da abertura da Copa do Mundo, Cidade do México enfrenta onda de protestos de professores | Bom Dia Brasil | G1. Manifestantes de várias regiões do países se unem por aumento salarial e melhores condiçõe<strong>s para aposentadoria</strong>",
+                    "source": "g1.globo.com",
+                    "title": "Vídeo: Sede da abertura da Copa do Mundo, Cidade do México enfrenta onda de protestos de professores | Bom Dia Brasil | G1",
+                    "url": "https://g1.globo.com/bom-dia-brasil/video/sede-da-abertura-da-copa-do-mundo-cidade-do-mexico-enfrenta-onda-de-protestos-de-professores-14684185.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%. México",
+                        "snippet": "Manifestantes de várias regiões do países se unem por aumento salarial e melhores condiçõe<strong>s para aposentadoria</strong>",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "3afcc4333099d861",
+                    "text": "México promete abertura pacífica da Copa do Mundo em meio a protestos. O México garantiu que a abertura da Copa do Mundo de 2026 será pacífica, apesar dos <strong>protestos de professores em greve, que bloquearam o Zócalo, na Cidade do México, para exigir melhorias salariais e revogação de uma lei previdenciária</strong>.",
+                    "source": "oglobo.globo.com",
+                    "title": "México promete abertura pacífica da Copa do Mundo em meio a protestos",
+                    "url": "https://oglobo.globo.com/esportes/copa-do-mundo-2026/noticia/2026/06/09/mexico-promete-abertura-pacifica-da-copa-do-mundo-em-meio-a-protestos.ghtml",
+                    "domain": "oglobo.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%. México",
+                        "snippet": "O México garantiu que a abertura da Copa do Mundo de 2026 será pacífica, apesar dos <strong>protestos de professores em greve, que bloquearam o Zócalo, na Cidade do México, para exigir melhorias salariais e revogação de uma lei previdenciária</strong>.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "9a631afece209750",
+                    "text": "México, oficialmente Estados Unidos Mexicanos, é uma república constitucional federal localizada na América do Norte. O país é limitado a norte pelos Estados Unidos; ao sul e oeste pelo Oceano Pacífico; a sudeste pela Guatemala, Belize e Mar do Caribe; a leste pelo Golfo do México. Com um território que abrange quase 2 milhões de quilômetros quadrados, o México é o quinto maior país da América por área total e o 14.º maior país independente do mundo. Com uma população estimada para 2020 de 126 milhões de habitantes, é o 11.º país mais populoso do mundo e o mais populoso país da hispanofonia. O México é uma federação composta por 31 estados e a Cidade do México (capital). O México figura também como o segundo país mais populoso e segundo em PIB da América Latina, em ambos os casos superado ...",
+                    "source": "Wikipedia",
+                    "title": "México",
+                    "url": "https://pt.wikipedia.org/wiki/M%C3%A9xico",
+                    "domain": "pt.wikipedia.org",
+                    "similarity": 0.1,
+                    "published_at": null,
+                    "retrieval_layer": "wikipedia",
+                    "source_type": "encyclopedia",
+                    "trusted_source": false,
+                    "stance": null,
+                    "metadata": {
+                        "title": "México",
+                        "description": "país na América do Norte",
+                        "lang": "pt",
+                        "source": "pt.wikipedia.org",
+                        "query": "México"
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "debe8d30",
+            "claim_text": "A CNTE exige um aumento salarial de 100%, proposta rejeitada pelo governo federal por ser considerada inviável.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 3.621,
+            "evidences": [
+                {
+                    "evidence_id": "3cec30f1107b58f2",
+                    "text": "CNTE comemora reajuste do piso do magistério; prefeitos contestam | Agência Brasil. De acordo com a CNTE, o critério de reajuste foi amplamente debatido no âmbito do Fórum Permanente do Piso, com base nos princípios da previsibilidade e da sustentabilidade orçamentária. Ainda segundo a entidade, as organizações representativas dos secretários estaduais e municipais de educação concordaram com a proposta, &quot;reforçando o caráter pactuado, responsável e federativo da decisão&quot;. O piso salarial é o valor mínimo que professores devem ganhar no Brasil.",
+                    "source": "agenciabrasil.ebc.com.br",
+                    "title": "CNTE comemora reajuste do piso do magistério; prefeitos contestam | Agência Brasil",
+                    "url": "https://agenciabrasil.ebc.com.br/politica/noticia/2026-01/cnte-comemora-reajuste-do-piso-do-magisterio-prefeitos-contestam",
+                    "domain": "agenciabrasil.ebc.com.br",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A CNTE exige um aumento salarial de 100%, proposta rejeitada pelo governo federal por ser considerada inviável. CNTE",
+                        "snippet": "De acordo com a CNTE, o critério de reajuste foi amplamente debatido no âmbito do Fórum Permanente do Piso, com base nos princípios da previsibilidade e da sustentabilidade orçamentária. Ainda segundo a entidade, as organizações representativas dos secretários estaduais e municipais de educação concordaram com a proposta, &quot;reforçando o caráter pactuado, responsável e federativo da decisão&quot;. O piso salarial é o valor mínimo que professores devem ganhar no Brasil.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "4df531a1775e9e68",
+                    "text": "CCJ da Câmara aprova propostas que acabam com a escala 6X1; o que acontece agora - BBC News Brasil. O projeto de lei apresentado pelo governo na semana passada reduz a carga semanal de trabalho de 44 para 40 horas, garante dois dias de descanso remunerado e <strong>proíbe qualquer redução salarial em decorrência da mudança</strong>.",
+                    "source": "bbc.com",
+                    "title": "CCJ da Câmara aprova propostas que acabam com a escala 6X1; o que acontece agora - BBC News Brasil",
+                    "url": "https://www.bbc.com/portuguese/articles/cy01rl1yx66o",
+                    "domain": "bbc.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A CNTE exige um aumento salarial de 100%, proposta rejeitada pelo governo federal por ser considerada inviável. CNTE",
+                        "snippet": "O projeto de lei apresentado pelo governo na semana passada reduz a carga semanal de trabalho de 44 para 40 horas, garante dois dias de descanso remunerado e <strong>proíbe qualquer redução salarial em decorrência da mudança</strong>.",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "f85ca071",
+            "claim_text": "O local receberá a partida de abertura da Copa do Mundo, entre México e África do Sul.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "wikipedia",
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes"
+            },
+            "retrieval_time": 3.355,
+            "evidences": [
+                {
+                    "evidence_id": "3f62ef30d5f98a32",
+                    "text": "Abertura da Copa 2026 terá eventos simultâneos em três países | Agência Brasil. Competição terá o maior número de seleções da história. A abertura será quinta-feira, no <strong>Estádio Azteca</strong>, com a partida entre México e África do Sul.",
+                    "source": "agenciabrasil.ebc.com.br",
+                    "title": "Abertura da Copa 2026 terá eventos simultâneos em três países | Agência Brasil",
+                    "url": "https://agenciabrasil.ebc.com.br/esportes/noticia/2026-06/abertura-da-copa-2026-tera-eventos-simultaneos-em-tres-paises",
+                    "domain": "agenciabrasil.ebc.com.br",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "O local receberá a partida de abertura da Copa do Mundo, entre México e África do Sul. México África do Sul",
+                        "snippet": "Competição terá o maior número de seleções da história. A abertura será quinta-feira, no <strong>Estádio Azteca</strong>, com a partida entre México e África do Sul.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "54383235240d1605",
+                    "text": "México, oficialmente Estados Unidos Mexicanos, é uma república constitucional federal localizada na América do Norte. O país é limitado a norte pelos Estados Unidos; ao sul e oeste pelo Oceano Pacífico; a sudeste pela Guatemala, Belize e Mar do Caribe; a leste pelo Golfo do México. Com um território que abrange quase 2 milhões de quilômetros quadrados, o México é o quinto maior país da América por área total e o 14.º maior país independente do mundo. Com uma população estimada para 2020 de 126 milhões de habitantes, é o 11.º país mais populoso do mundo e o mais populoso país da hispanofonia. O México é uma federação composta por 31 estados e a Cidade do México (capital). O México figura também como o segundo país mais populoso e segundo em PIB da América Latina, em ambos os casos superado ...",
+                    "source": "Wikipedia",
+                    "title": "México",
+                    "url": "https://pt.wikipedia.org/wiki/M%C3%A9xico",
+                    "domain": "pt.wikipedia.org",
+                    "similarity": 0.3,
+                    "published_at": null,
+                    "retrieval_layer": "wikipedia",
+                    "source_type": "encyclopedia",
+                    "trusted_source": false,
+                    "stance": null,
+                    "metadata": {
+                        "title": "México",
+                        "description": "país na América do Norte",
+                        "lang": "pt",
+                        "source": "pt.wikipedia.org",
+                        "query": "México"
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "feb4dbf1",
+            "claim_text": "A insatisfação ganhou força após o , em maio de 2025, de um reajuste de 10%, com aplicação prevista apenas para setembro de 2026.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.347,
+            "evidences": [
+                {
+                    "evidence_id": "b33b20197dc8d783",
+                    "text": "Mercado reduz para 4,05% expectativas da inflação para 2026 | Agência Brasil. Na semana passada, este índice, que serve de referência para a inflação oficial do país, estava em 4,06%. E há quatro semanas em 4,10%, segundo Boletim Focus.",
+                    "source": "agenciabrasil.ebc.com.br",
+                    "title": "Mercado reduz para 4,05% expectativas da inflação para 2026 | Agência Brasil",
+                    "url": "https://agenciabrasil.ebc.com.br/economia/noticia/2026-01/mercado-reduz-para-405-expectativas-da-inflacao-para-2026",
+                    "domain": "agenciabrasil.ebc.com.br",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A insatisfação ganhou força após o , em maio de 2025, de um reajuste de 10%, com aplicação prevista apenas para setembro de 2026.",
+                        "snippet": "Na semana passada, este índice, que serve de referência para a inflação oficial do país, estava em 4,06%. E há quatro semanas em 4,10%, segundo Boletim Focus.",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "8596a09c",
+            "claim_text": "Na prática, o rendimento médio de entrada no magistério gira em torno de R$ 2 mil.",
+            "rag_score": 0.0,
+            "layers_used": [],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes",
+                "web_search": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.259,
+            "evidences": []
+        },
+        {
+            "claim_id": "dc9c0275",
+            "claim_text": "Já o SNTE defende um reajuste de 13% para 2026, argumentando que a inflação tem reduzido o poder de compra da categoria.",
+            "rag_score": 0.0,
+            "layers_used": [],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes",
+                "web_search": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.11,
+            "evidences": []
+        },
+        {
+            "claim_id": "5d39924d",
+            "claim_text": "Bloqueios de vias estratégicas, ocupações e confrontos marcaram os últimos dias na Cidade do México.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.369,
+            "evidences": [
+                {
+                    "evidence_id": "9c487da0cdf25a88",
+                    "text": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1. <strong>Bloqueios de vias estratégicas, ocupações e confrontos marcaram os últimos dias na Cidade do México</strong>.",
+                    "source": "g1.globo.com",
+                    "title": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1",
+                    "url": "https://g1.globo.com/trabalho-e-carreira/noticia/2026/06/10/sem-solucao-a-bola-nao-rola-professores-pedem-aumento-de-100percent-em-protestos-contra-a-copa-no-mexico.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Bloqueios de vias estratégicas, ocupações e confrontos marcaram os últimos dias na Cidade do México. Cidade do México",
+                        "snippet": "<strong>Bloqueios de vias estratégicas, ocupações e confrontos marcaram os últimos dias na Cidade do México</strong>.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "15560442cb4b8b3f",
+                    "text": "Protestos no México geram instabilidade antes da Copa do Mundo | G1. <strong>Milhares de pessoas participaram de uma passeata pelo centro histórico da capital mexicana esta semana como parte dos protestos organizados pela CNTE, bloqueando ruas e promovendo tumultos</strong>.",
+                    "source": "g1.globo.com",
+                    "title": "Protestos no México geram instabilidade antes da Copa do Mundo | G1",
+                    "url": "https://g1.globo.com/mundo/noticia/2026/06/06/protestos-no-mexico-geram-instabilidade-antes-da-copa-do-mundo.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Bloqueios de vias estratégicas, ocupações e confrontos marcaram os últimos dias na Cidade do México. Cidade do México",
+                        "snippet": "<strong>Milhares de pessoas participaram de uma passeata pelo centro histórico da capital mexicana esta semana como parte dos protestos organizados pela CNTE, bloqueando ruas e promovendo tumultos</strong>.",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "949361a6",
+            "claim_text": "Considerada a ala mais combativa dos professores mexicanos, a CNTE convocou uma greve nacional por tempo indeterminado em 1º de junho e, desde então, ampliou sua presença nas ruas da capital.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 3.27,
+            "evidences": [
+                {
+                    "evidence_id": "ec573773df4d0a02",
+                    "text": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1. <strong>Considerada a ala mais combativa dos professores mexicanos, a CNTE convocou uma greve nacional por tempo indeterminado em 1º de junho e, desde então, ampliou sua presença nas ruas da capital</strong>.",
+                    "source": "g1.globo.com",
+                    "title": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1",
+                    "url": "https://g1.globo.com/trabalho-e-carreira/noticia/2026/06/10/sem-solucao-a-bola-nao-rola-professores-pedem-aumento-de-100percent-em-protestos-contra-a-copa-no-mexico.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Considerada a ala mais combativa dos professores mexicanos, a CNTE convocou uma greve nacional por tempo indeterminado em 1º de junho e, desde então, ampliou sua presença nas ruas da capital. CNTE",
+                        "snippet": "<strong>Considerada a ala mais combativa dos professores mexicanos, a CNTE convocou uma greve nacional por tempo indeterminado em 1º de junho e, desde então, ampliou sua presença nas ruas da capital</strong>.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "f368b2c49ba8db47",
+                    "text": "Protestos no México geram instabilidade antes da Copa do Mundo | G1. Já em 1º de junho, o poderoso sindicato dos professores do México, <strong>a Coordenadoria Nacional dos Trabalhadores da Educação</strong> (CNTE), convocou uma greve nacional por tempo indeterminado exigindo aumento salarial de 100% para a categoria.",
+                    "source": "g1.globo.com",
+                    "title": "Protestos no México geram instabilidade antes da Copa do Mundo | G1",
+                    "url": "https://g1.globo.com/mundo/noticia/2026/06/06/protestos-no-mexico-geram-instabilidade-antes-da-copa-do-mundo.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Considerada a ala mais combativa dos professores mexicanos, a CNTE convocou uma greve nacional por tempo indeterminado em 1º de junho e, desde então, ampliou sua presença nas ruas da capital. CNTE",
+                        "snippet": "Já em 1º de junho, o poderoso sindicato dos professores do México, <strong>a Coordenadoria Nacional dos Trabalhadores da Educação</strong> (CNTE), convocou uma greve nacional por tempo indeterminado exigindo aumento salarial de 100% para a categoria.",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "4193ad64",
+            "claim_text": "A situação aumenta a tensão no país e ameaça a realização do torneio.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.03,
+            "evidences": [
+                {
+                    "evidence_id": "18811f09406c2c85",
+                    "text": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1. A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), <strong>o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%</strong>. A situação aumenta a tensão no país ...",
+                    "source": "g1.globo.com",
+                    "title": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1",
+                    "url": "https://g1.globo.com/trabalho-e-carreira/noticia/2026/06/10/sem-solucao-a-bola-nao-rola-professores-pedem-aumento-de-100percent-em-protestos-contra-a-copa-no-mexico.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A situação aumenta a tensão no país e ameaça a realização do torneio.",
+                        "snippet": "A poucas horas da abertura da Copa do Mundo de 2026, marcada para esta quinta-feira (11), <strong>o México enfrenta uma escalada de protestos liderados por professores, que pedem aumentos salariais de até 100%</strong>. A situação aumenta a tensão no país ...",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "36fec2b2",
+            "claim_text": "Os sindicatos da categoria aproveitam a visibilidade global do evento para pressionar o governo por reajustes salariais e mudanças nas condições de trabalho.",
+            "rag_score": 0.0,
+            "layers_used": [],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes",
+                "web_search": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.24,
+            "evidences": []
+        },
+        {
+            "claim_id": "ea3870a3",
+            "claim_text": "A mobilização é organizada pela Coordenadoria Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do principal sindicato da categoria.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 3.393,
+            "evidences": [
+                {
+                    "evidence_id": "8152f071b385ef45",
+                    "text": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1. <strong>A mobilização é organizada pela Coordenadoria Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do principal sindicato da categoria</strong>.",
+                    "source": "g1.globo.com",
+                    "title": "Professores pedem aumento de 100% em protestos contra a Copa no México | G1",
+                    "url": "https://g1.globo.com/trabalho-e-carreira/noticia/2026/06/10/sem-solucao-a-bola-nao-rola-professores-pedem-aumento-de-100percent-em-protestos-contra-a-copa-no-mexico.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A mobilização é organizada pela Coordenadoria Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do principal sindicato da categoria. Coordenadoria Nacional dos Trabalhadores da Educação CNTE",
+                        "snippet": "<strong>A mobilização é organizada pela Coordenadoria Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do principal sindicato da categoria</strong>.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "800a86340d39ba81",
+                    "text": "Presidente do México enfrenta protestos de milhares de professores a dois dias da abertura da Copa do Mundo 2026. A presidente, que não comparecerá à cerimônia de abertura no Estádio Azteca após decidir doar seu ingresso a uma menina, havia anunciado que assistiria à partida no Zócalo, principal praça da capital mexicana e sede do maior fan fest organizado pela Fifa no país, onde torcedores podem acompanhar os jogos em telões. O local abriga ainda o Palácio Nacional, residência e local de trabalho de Sheinbaum. No entanto, a área está cercada por um acampamento montado pela Coordenadora Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do sindicato dos professores que está em greve desde a semana passada.",
+                    "source": "oglobo.globo.com",
+                    "title": "Presidente do México enfrenta protestos de milhares de professores a dois dias da abertura da Copa do Mundo 2026",
+                    "url": "https://oglobo.globo.com/mundo/noticia/2026/06/09/presidente-do-mexico-enfrenta-protestos-de-milhares-de-professores-a-dois-dias-da-abertura-da-copa-do-mundo-2026.ghtml",
+                    "domain": "oglobo.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A mobilização é organizada pela Coordenadoria Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do principal sindicato da categoria. Coordenadoria Nacional dos Trabalhadores da Educação CNTE",
+                        "snippet": "A presidente, que não comparecerá à cerimônia de abertura no Estádio Azteca após decidir doar seu ingresso a uma menina, havia anunciado que assistiria à partida no Zócalo, principal praça da capital mexicana e sede do maior fan fest organizado pela Fifa no país, onde torcedores podem acompanhar os jogos em telões. O local abriga ainda o Palácio Nacional, residência e local de trabalho de Sheinbaum. No entanto, a área está cercada por um acampamento montado pela Coordenadora Nacional dos Trabalhadores da Educação (CNTE), grupo dissidente do sindicato dos professores que está em greve desde a semana passada.",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "dcfc17d9",
+            "claim_text": "Além dela, o Sindicato Nacional dos Trabalhadores da Educação (SNTE) também reivindica reajustes, embora adote uma postura mais moderada.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 1.976,
+            "evidences": [
+                {
+                    "evidence_id": "a8b81e2d5d33aba4",
+                    "text": "Educação municipal faz ato por reajuste salarial em Rio Branco | G1. <strong>Objetivo do ato é cobrar a reposição inflacionária do piso salarial do magistério referente aos anos de 2024, 2025 e 2026</strong>. Durante a assembleia, os trabalhadores também devem analisar uma proposta apresentada pela prefeitura.",
+                    "source": "g1.globo.com",
+                    "title": "Educação municipal faz ato por reajuste salarial em Rio Branco | G1",
+                    "url": "https://g1.globo.com/ac/acre/noticia/2026/05/11/educacao-municipal-faz-ato-por-reajuste-salarial-e-avanco-nas-negociacoes-em-rio-branco.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Além dela, o Sindicato Nacional dos Trabalhadores da Educação (SNTE) também reivindica reajustes, embora adote uma postura mais moderada.",
+                        "snippet": "<strong>Objetivo do ato é cobrar a reposição inflacionária do piso salarial do magistério referente aos anos de 2024, 2025 e 2026</strong>. Durante a assembleia, os trabalhadores também devem analisar uma proposta apresentada pela prefeitura.",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "cfd9be9d",
+            "claim_text": "Os atos reúnem principalmente professores da educação básica, incluindo trabalhadores com contratos parciais, que representam uma parcela significativa da categoria no país.",
+            "rag_score": 0.0,
+            "layers_used": [],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes",
+                "web_search": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.367,
+            "evidences": []
+        },
+        {
+            "claim_id": "db9f408e",
+            "claim_text": "Para o sindicato, o percentual não acompanha o aumento do custo de vida.",
+            "rag_score": 0.0,
+            "layers_used": [],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes",
+                "web_search": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.309,
+            "evidences": []
+        },
+        {
+            "claim_id": "9447baa4",
+            "claim_text": "Além da pauta salarial, os professores criticam políticas educacionais do governo e regras previdenciárias.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 1.948,
+            "evidences": [
+                {
+                    "evidence_id": "24023f02b015defb",
+                    "text": "Piso salarial dos professores: entenda como funciona e se estados e municípios são obrigados a seguir reajuste | G1. Não é a primeira vez que a CNM questiona o reajuste. <strong>Em 2022, já havia feito isso ao criticar o reajuste de 33,24% anunciado pelo então presidente Jair Bolsonaro</strong>.",
+                    "source": "g1.globo.com",
+                    "title": "Piso salarial dos professores: entenda como funciona e se estados e municípios são obrigados a seguir reajuste | G1",
+                    "url": "https://g1.globo.com/educacao/noticia/2023/01/19/piso-salarial-dos-professores-entenda-como-funciona-e-se-estados-e-municipios-sao-obrigados-a-seguir-reajuste.ghtml",
+                    "domain": "g1.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "Além da pauta salarial, os professores criticam políticas educacionais do governo e regras previdenciárias.",
+                        "snippet": "Não é a primeira vez que a CNM questiona o reajuste. <strong>Em 2022, já havia feito isso ao criticar o reajuste de 33,24% anunciado pelo então presidente Jair Bolsonaro</strong>.",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        },
+        {
+            "claim_id": "50a2d7ff",
+            "claim_text": "A proximidade da Copa transformou as reivindicações em uma questão de repercussão internacional.",
+            "rag_score": 0.55,
+            "layers_used": [
+                "web_search"
+            ],
+            "layers_failed": {
+                "vector_store": "sem resultados relevantes",
+                "factcheck": "sem resultados relevantes",
+                "wikipedia": "sem resultados relevantes"
+            },
+            "retrieval_time": 2.053,
+            "evidences": [
+                {
+                    "evidence_id": "1daa020fcda56177",
+                    "text": "Copa do Mundo: como evento expõe relação tensa entre países-sede - BBC News Brasil. O Canadá já havia se indignado com os repetidos comentários do presidente americano sobre transformar o país no &quot;51° Estado&quot; americano e respondeu com suas próprias medidas contrárias. Províncias canadenses retiraram bebidas americanas das prateleiras e seus cidadãos reduziram consideravelmente suas viagens para o vizinho do sul, o que também acabou irritando os Estados Unidos. Os problemas com os Estados Unidos também prejudicaram as relações entre o Canadá e o México, indica o diretor de política internacional da Universidade de Calgary, no Canadá, Carlo Dade.",
+                    "source": "bbc.com",
+                    "title": "Copa do Mundo: como evento expõe relação tensa entre países-sede - BBC News Brasil",
+                    "url": "https://www.bbc.com/portuguese/articles/clypy67q3dko",
+                    "domain": "bbc.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A proximidade da Copa transformou as reivindicações em uma questão de repercussão internacional.",
+                        "snippet": "O Canadá já havia se indignado com os repetidos comentários do presidente americano sobre transformar o país no &quot;51° Estado&quot; americano e respondeu com suas próprias medidas contrárias. Províncias canadenses retiraram bebidas americanas das prateleiras e seus cidadãos reduziram consideravelmente suas viagens para o vizinho do sul, o que também acabou irritando os Estados Unidos. Os problemas com os Estados Unidos também prejudicaram as relações entre o Canadá e o México, indica o diretor de política internacional da Universidade de Calgary, no Canadá, Carlo Dade.",
+                        "trusted_domain": true
+                    }
+                },
+                {
+                    "evidence_id": "f779c0dbee67b4a5",
+                    "text": "Política migratória dos EUA impõe obstáculo inédito a jogadores, árbitros e comissões técnicas na Copa do Mundo 2026. Se a chegada aos EUA foi uma corrida de obstáculos para os protagonistas da Copa, para muitos torcedores e profissionais ligados ao esporte, a única opção viável é a televisão. Além das restrições a certos passaportes, o elevado índice de rejeição de vistos, os preços elevados dos ingressos e o temor de ser barrado na fronteira reduziram o interesse externo em acompanhar os jogos in loco. Na semana passada, a Associação Internacional de Imprensa Esportiva (AIPS) escreveu uma carta à Fifa reclamando da rejeição de vistos para jornalistas do Irã e de países da África.",
+                    "source": "oglobo.globo.com",
+                    "title": "Política migratória dos EUA impõe obstáculo inédito a jogadores, árbitros e comissões técnicas na Copa do Mundo 2026",
+                    "url": "https://oglobo.globo.com/mundo/noticia/2026/06/09/politica-migratoria-dos-eua-impoe-obstaculo-inedito-a-jogadores-arbitros-e-comissoes-tecnicas-na-copa-do-mundo-2026.ghtml",
+                    "domain": "oglobo.globo.com",
+                    "similarity": 0.55,
+                    "published_at": null,
+                    "retrieval_layer": "web_search",
+                    "source_type": "web",
+                    "trusted_source": true,
+                    "stance": null,
+                    "metadata": {
+                        "search_engine": "brave_search",
+                        "query": "A proximidade da Copa transformou as reivindicações em uma questão de repercussão internacional.",
+                        "snippet": "Se a chegada aos EUA foi uma corrida de obstáculos para os protagonistas da Copa, para muitos torcedores e profissionais ligados ao esporte, a única opção viável é a televisão. Além das restrições a certos passaportes, o elevado índice de rejeição de vistos, os preços elevados dos ingressos e o temor de ser barrado na fronteira reduziram o interesse externo em acompanhar os jogos in loco. Na semana passada, a Associação Internacional de Imprensa Esportiva (AIPS) escreveu uma carta à Fifa reclamando da rejeição de vistos para jornalistas do Irã e de países da África.",
+                        "trusted_domain": true
+                    }
+                }
+            ]
+        }
+    ],
+    "similarity_scores": [
+        {
+            "claim_id": "f68413d5",
+            "score": 0.7581,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "g1.globo.com",
+                "similarity_final": 0.7581,
+                "similarity_semantic": 0.8472
+            }
+        },
+        {
+            "claim_id": "e806bdee",
+            "score": 0.2659,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "Wikipedia",
+                "similarity_final": 0.2659,
+                "similarity_semantic": 0.3263
+            }
+        },
+        {
+            "claim_id": "50041e59",
+            "score": 0.6391,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "agenciabrasil.ebc.com.br",
+                "similarity_final": 0.6391,
+                "similarity_semantic": 0.6774
+            }
+        },
+        {
+            "claim_id": "6e776115",
+            "score": 0.0,
+            "has_evidence": false,
+            "top_evidence": null
+        },
+        {
+            "claim_id": "ccb6e9f0",
+            "score": 0.7414,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "g1.globo.com",
+                "similarity_final": 0.7414,
+                "similarity_semantic": 0.8235
+            }
+        },
+        {
+            "claim_id": "debe8d30",
+            "score": 0.54,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "agenciabrasil.ebc.com.br",
+                "similarity_final": 0.54,
+                "similarity_semantic": 0.5357
+            }
+        },
+        {
+            "claim_id": "f85ca071",
+            "score": 0.6623,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "agenciabrasil.ebc.com.br",
+                "similarity_final": 0.6623,
+                "similarity_semantic": 0.7105
+            }
+        },
+        {
+            "claim_id": "feb4dbf1",
+            "score": 0.455,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "agenciabrasil.ebc.com.br",
+                "similarity_final": 0.455,
+                "similarity_semantic": 0.4142
+            }
+        },
+        {
+            "claim_id": "8596a09c",
+            "score": 0.0,
+            "has_evidence": false,
+            "top_evidence": null
+        },
+        {
+            "claim_id": "dc9c0275",
+            "score": 0.0,
+            "has_evidence": false,
+            "top_evidence": null
+        },
+        {
+            "claim_id": "5d39924d",
+            "score": 0.5654,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "g1.globo.com",
+                "similarity_final": 0.5654,
+                "similarity_semantic": 0.572
+            }
+        },
+        {
+            "claim_id": "949361a6",
+            "score": 0.7291,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "g1.globo.com",
+                "similarity_final": 0.7291,
+                "similarity_semantic": 0.8059
+            }
+        },
+        {
+            "claim_id": "4193ad64",
+            "score": 0.4354,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "g1.globo.com",
+                "similarity_final": 0.4354,
+                "similarity_semantic": 0.3862
+            }
+        },
+        {
+            "claim_id": "36fec2b2",
+            "score": 0.0,
+            "has_evidence": false,
+            "top_evidence": null
+        },
+        {
+            "claim_id": "ea3870a3",
+            "score": 0.6338,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "g1.globo.com",
+                "similarity_final": 0.6338,
+                "similarity_semantic": 0.6697
+            }
+        },
+        {
+            "claim_id": "dcfc17d9",
+            "score": 0.5023,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "g1.globo.com",
+                "similarity_final": 0.5023,
+                "similarity_semantic": 0.4819
+            }
+        },
+        {
+            "claim_id": "cfd9be9d",
+            "score": 0.0,
+            "has_evidence": false,
+            "top_evidence": null
+        },
+        {
+            "claim_id": "db9f408e",
+            "score": 0.0,
+            "has_evidence": false,
+            "top_evidence": null
+        },
+        {
+            "claim_id": "9447baa4",
+            "score": 0.6586,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "g1.globo.com",
+                "similarity_final": 0.6586,
+                "similarity_semantic": 0.7051
+            }
+        },
+        {
+            "claim_id": "50a2d7ff",
+            "score": 0.5905,
+            "has_evidence": true,
+            "top_evidence": {
+                "source": "oglobo.globo.com",
+                "similarity_final": 0.5905,
+                "similarity_semantic": 0.6079
+            }
+        }
+    ],
+    "stance_results": null,
+    "classification": null,
+    "text_features": null,
+    "reputation": {
+        "domain": "g1.globo.com",
+        "is_trusted_domain": true,
+        "source_category": "trusted_news_source",
+        "score": 0.9,
+        "reason": "O domínio da notícia está cadastrado na base de fontes jornalísticas confiáveis do sistema."
+    },
+    "score_final": 47.93,
+    "label_final": "não confiável",
+    "score_breakdown": {
+        "evidence_score": 66.43,
+        "coverage_score": 45.0,
+        "evidence_component": 29.89,
+        "reputation_score": 90.0,
+        "min_valid_evidence_score": 0.55,
+        "weights": {
+            "evidence": 0.7,
+            "reputation": 0.3
+        }
+    },
+    "explanation": null,
+    "auto_indexing": {
+        "indexed": false,
+        "reason": "Score final abaixo do limite mínimo (47.93 < 75.0).",
+        "doc_ids": []
+    },
+    "processing_time": {
+        "extractor": 13.598,
+        "cleaner": 0.007,
+        "normalizer": 0.187,
+        "segmentation": 0.433,
+        "claim_detector": 0.393,
+        "retriever": 67.809,
+        "similarity": 1.121,
+        "reputation": 0.001,
+        "aggregator": 0.001,
+        "auto_indexer": 0.0,
+        "stance": 0.0,
+        "bertimbau": 0.0,
+        "text_features": 0.0,
+        "explanation": 0.0,
+        "formatter": 0.0,
+        "total": 83.55
+    }
+}
