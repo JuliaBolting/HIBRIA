@@ -473,7 +473,7 @@ class ClaimDetector:
         cls,
         sentences: list,            # list[Sentence] do segmentation.py
         min_confidence: float = 0.15,
-        max_claims: int = 20,
+        max_claims: int = 50,
     ) -> dict:
         """
         Processa lista de sentenças e extrai claims verificáveis.
