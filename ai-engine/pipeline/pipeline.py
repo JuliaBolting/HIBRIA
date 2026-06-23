@@ -549,15 +549,27 @@ class HibriaPipeline:
     @staticmethod
     def _step_bertimbau(result: PipelineResult) -> PipelineResult:
         """
-        🔲 PENDENTE: bertimbau_classifier.py
-        Classifica o texto com BERTimbau fine-tuned no Fake.Br Corpus.
-        Entrada: blocks_bert (perfil sem alterações para Transformers)
+        Etapa 8: classificação textual com BERTimbau.
+
+        Usa blocks_bert, que preserva o texto em formato adequado para
+        Transformers. O resultado é um componente auxiliar do score final;
+        ele não substitui RAG, stance ou reputação da fonte.
         """
-        # TODO: implementar
-        # from pipeline.analysis.bertimbau_classifier import BERTimbauClassifier
-        # result.classification = BERTimbauClassifier().classify(
-        #     result.blocks_bert,
-        # )
+        from pipeline.analysis.bertimbau_classifier import BERTimbauClassifier
+
+        result.classification = BERTimbauClassifier().classify(result.blocks_bert)
+
+        status = result.classification.get("status")
+        label = result.classification.get("label", "indefinido")
+        score = result.classification.get("score")
+
+        if status == "ok":
+            logger.info(f"[bertimbau] label={label} · score={score}")
+        else:
+            message = result.classification.get("message", "sem detalhes")
+            result.warnings.append(f"[bertimbau] {status}: {message}")
+            logger.warning(f"[bertimbau] {status}: {message}")
+
         return result
 
     @staticmethod
@@ -688,6 +700,7 @@ class HibriaPipeline:
             ("retriever", cls._step_retrieve),
             ("similarity", cls._step_similarity),
             ("stance", cls._step_stance),
+            ("bertimbau", cls._step_bertimbau),
             ("reputation", cls._step_reputation),
             ("aggregator", cls._step_aggregate),
             ("auto_indexer", cls._step_auto_index),
@@ -695,7 +708,6 @@ class HibriaPipeline:
 
         # ── steps pendentes ───────────────────────────────────────────────────
         steps_pending = [
-            ("bertimbau", cls._step_bertimbau),
             ("text_features", cls._step_text_features),
             ("explanation", cls._step_explain),
             ("formatter", cls._step_format),
@@ -738,7 +750,7 @@ class HibriaPipeline:
             f"{result.evidence_count} evidências"
         )
         return result
-    
+
     @staticmethod
     def _step_stance(result: PipelineResult) -> PipelineResult:
         """
