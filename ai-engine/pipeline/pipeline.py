@@ -22,8 +22,48 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
+from pipeline.analysis.stance_model import StanceModel
+import os
 
 logger = logging.getLogger(__name__)
+
+def env_int(name: str, default: int) -> int:
+    """
+    Lê inteiro do .env com fallback seguro.
+    """
+    value = os.getenv(name)
+
+    if value is None or value.strip() == "":
+        return default
+
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning(
+            f"[env] valor inválido para {name}={value!r}; usando padrão {default}"
+        )
+        return default
+
+
+def env_flag(name: str, default: bool = False) -> bool:
+    """
+    Lê booleano do .env.
+    Aceita: true, 1, yes, y, sim, s, on.
+    """
+    value = os.getenv(name)
+
+    if value is None or value.strip() == "":
+        return default
+
+    return value.strip().lower() in {
+        "true",
+        "1",
+        "yes",
+        "y",
+        "sim",
+        "s",
+        "on",
+    }
 
 
 # =============================================================================
@@ -97,7 +137,7 @@ class PipelineResult:
 
     # ── response_formatter (pendente) ─────────────────────────────────────────
     response: dict | None = None  # JSON final para a extensão
-    
+
     # ── auto_indexer ─────────────────────────────────────────────────────────────
     auto_indexing: dict | None = None
 
@@ -204,17 +244,51 @@ class PipelineResult:
                 [
                     {
                         "claim_id": r.claim_id,
+                        "claim_text": r.claim_text,
                         "score": r.score,
                         "has_evidence": r.has_evidence,
+                        "has_sufficient_evidence": getattr(
+                            r,
+                            "has_sufficient_evidence",
+                            False,
+                        ),
                         "top_evidence": (
                             {
+                                "text": r.top_evidence.evidence_text[:200],
                                 "source": r.top_evidence.evidence_source,
+                                "url": r.top_evidence.evidence_url,
+                                "layer": r.top_evidence.evidence_layer,
+                                "source_type": r.top_evidence.source_type,
+                                "trusted_source": r.top_evidence.trusted_source,
                                 "similarity_final": r.top_evidence.similarity_final,
                                 "similarity_semantic": r.top_evidence.similarity_semantic,
+                                "similarity_retriever": r.top_evidence.similarity_retriever,
+                                "is_sufficient": getattr(
+                                    r.top_evidence,
+                                    "is_sufficient",
+                                    False,
+                                ),
                             }
                             if r.top_evidence
                             else None
                         ),
+                        "evidences": [
+                            {
+                                "rank": e.rank,
+                                "text": e.evidence_text[:200],
+                                "source": e.evidence_source,
+                                "url": e.evidence_url,
+                                "layer": e.evidence_layer,
+                                "source_type": e.source_type,
+                                "trusted_source": e.trusted_source,
+                                "published_at": e.published_at,
+                                "similarity_final": e.similarity_final,
+                                "similarity_semantic": e.similarity_semantic,
+                                "similarity_retriever": e.similarity_retriever,
+                                "is_sufficient": getattr(e, "is_sufficient", False),
+                            }
+                            for e in r.evidences
+                        ],
                     }
                     for r in self.similarity_scores
                 ]
@@ -222,7 +296,10 @@ class PipelineResult:
                 else None
             ),
             # resultados de análise (pendentes — None até implementar)
-            "stance_results": self.stance_results,
+            "stance_results": [
+                item.to_dict() if hasattr(item, "to_dict") else item
+                for item in (self.stance_results or [])
+            ],
             "classification": self.classification,
             "text_features": self.text_features,
             "reputation": self.reputation,
@@ -414,14 +491,25 @@ class HibriaPipeline:
             return result
 
         vector_store = HibriaPipeline._get_vector_store()
+        document_context = " ".join(
+            part
+            for part in [
+                result.title,
+                result.description,
+            ]
+            if part
+        )
+
+        document_context = document_context.strip()
         retriever = EvidenceRetriever(
             vector_store=vector_store,
             current_url=result.url,
+            document_context=document_context,
         )
 
         result.retrieval_results = retriever.retrieve_batch(
             result.claims,
-            top_k=10,
+            top_k=env_int("HIBRIA_RETRIEVAL_TOP_K", 10),
         )
 
         logger.info(
@@ -457,21 +545,6 @@ class HibriaPipeline:
     # =========================================================================
     # Steps pendentes — documentados para implementação futura
     # =========================================================================
-
-    @staticmethod
-    def _step_stance(result: PipelineResult) -> PipelineResult:
-        """
-        🔲 PENDENTE: stance_model.py
-        Classifica cada evidência como supports / refutes / neutral
-        em relação ao claim correspondente.
-        """
-        # TODO: implementar
-        # from pipeline.analysis.stance_model import StanceModel
-        # result.stance_results = StanceModel.classify(
-        #     result.claims,
-        #     result.retrieval_results,
-        # )
-        return result
 
     @staticmethod
     def _step_bertimbau(result: PipelineResult) -> PipelineResult:
@@ -614,6 +687,7 @@ class HibriaPipeline:
             ("claim_detector", cls._step_detect_claims),
             ("retriever", cls._step_retrieve),
             ("similarity", cls._step_similarity),
+            ("stance", cls._step_stance),
             ("reputation", cls._step_reputation),
             ("aggregator", cls._step_aggregate),
             ("auto_indexer", cls._step_auto_index),
@@ -621,7 +695,6 @@ class HibriaPipeline:
 
         # ── steps pendentes ───────────────────────────────────────────────────
         steps_pending = [
-            ("stance", cls._step_stance),
             ("bertimbau", cls._step_bertimbau),
             ("text_features", cls._step_text_features),
             ("explanation", cls._step_explain),
@@ -630,20 +703,31 @@ class HibriaPipeline:
 
         all_steps = steps_implemented + steps_pending
 
+        show_progress = env_flag("HIBRIA_SHOW_PIPELINE_PROGRESS", True)
+
         for name, step in all_steps:
             step_start = time.time()
+
+            if show_progress:
+                print(f"[pipeline] Iniciando etapa: {name}...", flush=True)
+
             try:
                 result = step(result)
             except ExtractionError:
-                # erro fatal — interrompe o pipeline
                 raise
             except Exception as e:
-                # erro não-fatal — registra e continua
                 msg = f"[{name}] falhou: {type(e).__name__}: {e}"
                 result.warnings.append(msg)
                 logger.error(msg, exc_info=True)
 
             result._processing_time[name] = round(time.time() - step_start, 3)
+
+            if show_progress:
+                print(
+                    f"[pipeline] Etapa concluída: {name} "
+                    f"({result._processing_time[name]}s)",
+                    flush=True,
+                )
 
         result._processing_time["total"] = round(time.time() - start_time, 3)
 
@@ -653,4 +737,23 @@ class HibriaPipeline:
             f"{result.claim_count} claims · "
             f"{result.evidence_count} evidências"
         )
+        return result
+    
+    @staticmethod
+    def _step_stance(result: PipelineResult) -> PipelineResult:
+        """
+        Analisa a relação entre cada claim e suas evidências recuperadas.
+
+        Esta etapa classifica se a evidência apoia, contradiz, é neutra ou
+        insuficiente em relação à claim. O resultado ainda não altera o score
+        final nesta versão; ele apenas enriquece a saída do pipeline.
+        """
+        result.stance_results = StanceModel.analyze_retrieval_results(
+            result.retrieval_results or []
+        )
+
+        logger.info(
+            f"[stance] {len(result.stance_results or [])} relações claim-evidência analisadas"
+        )
+
         return result
