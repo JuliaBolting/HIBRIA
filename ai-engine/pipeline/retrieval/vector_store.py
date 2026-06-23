@@ -24,13 +24,10 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
-
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -473,9 +470,21 @@ class VectorStore:
                 "url":          meta["url"],
                 "score":        round(similarity, 4),
                 "published_at": meta.get("published_at"),
-                "metadata":     meta.get("metadata", {}),
+
+                # IDs de rastreabilidade usados pelo retriever.py
                 "doc_id":       meta["doc_id"],
+                "base_doc_id":  meta.get("base_doc_id"),
+                "chunk_id":     meta.get("chunk_id"),
                 "faiss_rank":   len(results),
+                "indexed_at":   meta.get("indexed_at"),
+
+                # Metadados completos do documento
+                "metadata": {
+                    **(meta.get("metadata", {}) or {}),
+                    "base_doc_id": meta.get("base_doc_id"),
+                    "chunk_id": meta.get("chunk_id"),
+                    "indexed_at": meta.get("indexed_at"),
+                },
             })
 
             if len(results) >= top_k:
@@ -527,8 +536,6 @@ class VectorStore:
         # (necessário pois FAISS não suporta remoção direta no IndexFlatIP)
         surviving_indices = [i for i, _ in surviving]
         surviving_meta    = [m for _, m in surviving]
-
-        faiss = self._get_faiss()
 
         # extrai vetores dos índices sobreviventes
         # reconstruct_batch recupera os vetores originais do índice

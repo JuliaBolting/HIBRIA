@@ -1,12 +1,3 @@
-
----
-
-## ⚙️ **.gitignore**
-
-Salve o conteúdo abaixo em um arquivo chamado `.gitignore` também na raiz do projeto:
-
-```gitignore
-
 # Ambiente virtual
 .venv/
 venv/
@@ -16,6 +7,8 @@ env/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
 
 # Arquivos do Django
 *.log
