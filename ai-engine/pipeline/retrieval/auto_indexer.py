@@ -11,11 +11,23 @@
 # =============================================================================
 
 from __future__ import annotations
-
 from urllib.parse import urlparse
-
 from pipeline.retrieval.vector_store import VectorStore, Document
+import os
 
+def env_float(name: str, default: float) -> float:
+    """
+    Lê float do .env com fallback seguro.
+    """
+    value = os.getenv(name)
+
+    if value is None or value.strip() == "":
+        return default
+
+    try:
+        return float(value)
+    except ValueError:
+        return default
 
 class AutoIndexer:
     """
@@ -25,7 +37,7 @@ class AutoIndexer:
     passem a compor a base vetorial usada pelo RAG em análises futuras.
     """
 
-    MIN_SCORE_TO_INDEX = 75.0
+    MIN_SCORE_TO_INDEX: float = env_float("HIBRIA_MIN_SCORE_TO_INDEX", 75.0)
 
     @staticmethod
     def _extract_domain(url: str) -> str:
