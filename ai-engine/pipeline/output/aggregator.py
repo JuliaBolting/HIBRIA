@@ -2,34 +2,44 @@
 # aggregator.py
 # Combina os resultados parciais do pipeline em um score final de confiabilidade.
 #
-# Nesta versão inicial, o score considera:
-#   - Evidências recuperadas pelo RAG / FAISS
+# Componentes considerados nesta versão:
+#   - Evidências recuperadas pelo RAG / FAISS / web
 #   - Similaridade entre claims e evidências
+#   - Stance entre claim e evidência
 #   - Reputação do domínio da notícia analisada
-#
-# Futuramente, este módulo poderá incorporar:
-#   - stance_model
-#   - bertimbau_classifier
-#   - text_features
+#   - Classificação textual auxiliar com BERTimbau
 # =============================================================================
 
 from __future__ import annotations
+
 import os
+from typing import Any
 
 
-def env_float(name: str, default: float) -> float:
+def env_float(name: str, default: float, aliases: list[str] | None = None) -> float:
     """
     Lê float do .env com fallback seguro.
+
+    `aliases` mantém compatibilidade com nomes antigos de variáveis.
     """
-    value = os.getenv(name)
+    names = [name] + (aliases or [])
 
-    if value is None or value.strip() == "":
-        return default
+    for item in names:
+        value = os.getenv(item)
 
-    try:
-        return float(value)
-    except ValueError:
-        return default
+        if value is None or value.strip() == "":
+            continue
+
+        try:
+            return float(value)
+        except ValueError:
+            return default
+
+    return default
+
+
+def clamp(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
+    return max(minimum, min(maximum, value))
 
 
 class Aggregator:
@@ -40,23 +50,44 @@ class Aggregator:
     confiabilidade calculado a partir dos critérios disponíveis no sistema.
     """
 
-    MIN_VALID_EVIDENCE_SCORE: float = env_float("HIBRIA_MIN_VALID_EVIDENCE_SCORE", 0.55)
-    MIN_COVERAGE_FOR_RELIABLE: float = env_float("HIBRIA_MIN_COVERAGE_FOR_RELIABLE", 0.35)
-    MIN_COVERAGE_FOR_PARTIAL: float = env_float("HIBRIA_MIN_COVERAGE_FOR_PARTIAL", 0.20)
-    MIN_SUPPORT_RATE_FOR_RELIABLE: float = env_float("HIBRIA_MIN_SUPPORT_RATE_FOR_RELIABLE", 0.60)
-    MIN_CONTRADICTION_RATE_FOR_UNRELIABLE: float = env_float("HIBRIA_MIN_CONTRADICTION_RATE_FOR_UNRELIABLE", 0.40)
+    MIN_VALID_EVIDENCE_SCORE: float = env_float(
+        "HIBRIA_AGGREGATOR_MIN_VALID_EVIDENCE_SCORE",
+        0.55,
+        aliases=["HIBRIA_MIN_VALID_EVIDENCE_SCORE"],
+    )
+    MIN_COVERAGE_FOR_RELIABLE: float = env_float(
+        "HIBRIA_AGGREGATOR_MIN_COVERAGE_FOR_RELIABLE",
+        0.35,
+        aliases=["HIBRIA_MIN_COVERAGE_FOR_RELIABLE"],
+    )
+    MIN_COVERAGE_FOR_PARTIAL: float = env_float(
+        "HIBRIA_AGGREGATOR_MIN_COVERAGE_FOR_PARTIAL",
+        0.20,
+        aliases=["HIBRIA_MIN_COVERAGE_FOR_PARTIAL"],
+    )
+    MIN_SUPPORT_RATE_FOR_RELIABLE: float = env_float(
+        "HIBRIA_AGGREGATOR_MIN_SUPPORT_RATE_FOR_RELIABLE",
+        0.60,
+        aliases=["HIBRIA_MIN_SUPPORT_RATE_FOR_RELIABLE"],
+    )
+    MIN_CONTRADICTION_RATE_FOR_UNRELIABLE: float = env_float(
+        "HIBRIA_AGGREGATOR_MIN_CONTRADICTION_RATE_FOR_UNRELIABLE",
+        0.40,
+        aliases=["HIBRIA_MIN_CONTRADICTION_RATE_FOR_UNRELIABLE"],
+    )
 
     # Wikipedia é mantida como contexto, mas não conta como evidência factual principal.
     EXCLUDED_EVIDENCE_LAYERS = {"wikipedia"}
     EXCLUDED_SOURCE_TYPES = {"encyclopedia"}
 
     WEIGHTS = {
-        "evidence": env_float("HIBRIA_AGGREGATOR_EVIDENCE_WEIGHT", 0.70),
-        "reputation": env_float("HIBRIA_AGGREGATOR_REPUTATION_WEIGHT", 0.30),
+        "evidence": env_float("HIBRIA_AGGREGATOR_EVIDENCE_WEIGHT", 0.60),
+        "reputation": env_float("HIBRIA_AGGREGATOR_REPUTATION_WEIGHT", 0.25),
+        "bertimbau": env_float("HIBRIA_AGGREGATOR_BERTIMBAU_WEIGHT", 0.15),
     }
 
     @classmethod
-    def _is_valid_factual_evidence(cls, item) -> bool:
+    def _is_valid_factual_evidence(cls, item: Any) -> bool:
         """
         Define se uma evidência pode entrar no cálculo factual.
 
@@ -97,20 +128,16 @@ class Aggregator:
 
         if hasattr(top, "is_sufficient") and not top.is_sufficient:
             return False
-        
+
         if source_type == "ai_retrieved_web" and not trusted_source:
             return False
 
         return True
 
     @classmethod
-    def _calculate_evidence_score(cls, result) -> float:
+    def _calculate_evidence_score(cls, result: Any) -> float:
         """
         Calcula o score médio das claims que possuem evidência válida.
-
-        Uma evidência só é considerada válida quando passa do limiar mínimo
-        de similaridade final. Isso evita que evidências apenas superficialmente
-        relacionadas aumentem o score de confiabilidade.
         """
         if not result.similarity_scores:
             return 0.0
@@ -127,11 +154,9 @@ class Aggregator:
         return round(sum(scores) / len(scores), 4)
 
     @classmethod
-    def _calculate_coverage(cls, result) -> float:
+    def _calculate_coverage(cls, result: Any) -> float:
         """
-        Mede a cobertura de evidências válidas:
-        quantas claims possuem evidência acima do limiar mínimo em relação
-        ao total de claims analisadas.
+        Mede a cobertura de evidências válidas.
         """
         if not result.similarity_scores:
             return 0.0
@@ -150,17 +175,44 @@ class Aggregator:
         return round(with_valid_evidence / total, 4)
 
     @staticmethod
-    def _calculate_reputation_score(result) -> float:
+    def _calculate_reputation_score(result: Any) -> float:
         """
         Recupera o score de reputação calculado pelo reputation_engine.py.
         """
         if not result.reputation:
             return 0.0
 
-        return float(result.reputation.get("score", 0.0))
+        return clamp(float(result.reputation.get("score", 0.0)))
 
     @staticmethod
-    def _calculate_stance_stats(result) -> dict:
+    def _calculate_bertimbau_score(result: Any) -> float | None:
+        """
+        Recupera o score do BERTimbau quando a etapa foi executada com sucesso.
+
+        O score do bertimbau_classifier.py representa probabilidade de notícia
+        verdadeira. Quando o modelo falha, fica desativado ou não há texto, o
+        componente não entra no peso final.
+        """
+        classification = getattr(result, "classification", None)
+
+        if not classification or not isinstance(classification, dict):
+            return None
+
+        if classification.get("status") != "ok":
+            return None
+
+        score = classification.get("score")
+
+        if score is None:
+            return None
+
+        try:
+            return clamp(float(score))
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _calculate_stance_stats(result: Any) -> dict:
         """
         Calcula proporções de apoio, contradição, neutralidade e insuficiência.
 
@@ -192,8 +244,7 @@ class Aggregator:
             stats[stance] += 1
             stats["total"] += 1
 
-        # Aqui ignoramos "insufficient", porque ausência de evidência
-        # não é apoio nem contradição.
+        # Aqui ignoramos "insufficient", porque ausência de evidência não é apoio nem contradição.
         valid_total = stats["support"] + stats["contradict"] + stats["neutral"]
 
         if valid_total > 0:
@@ -210,15 +261,19 @@ class Aggregator:
         coverage_score: float,
         reputation_score: float,
         stance_stats: dict,
+        bertimbau_score: float | None,
     ) -> str:
         """
         Define o rótulo final sem confundir ausência de evidência com falsidade.
 
-        Regras:
+        Regras principais:
         - Contradição forte -> não confiável.
-        - Sem evidência suficiente -> evidência insuficiente.
+        - Sem evidência suficiente -> evidência insuficiente ou não verificado.
         - Boa evidência + boa cobertura -> confiável.
         - Evidência moderada -> parcialmente confiável.
+
+        O BERTimbau entra como componente auxiliar do score, mas não transforma
+        ausência de evidência em falsidade factual.
         """
         contradiction_rate = stance_stats.get("contradiction_rate", 0.0)
         support_rate = stance_stats.get("support_rate", 0.0)
@@ -229,6 +284,8 @@ class Aggregator:
         if coverage_score == 0 or evidence_score == 0:
             if reputation_score >= 0.80:
                 return "evidência insuficiente"
+            if bertimbau_score is not None and final_score >= 60:
+                return "não verificado"
             return "não verificado"
 
         if coverage_score < cls.MIN_COVERAGE_FOR_PARTIAL:
@@ -247,35 +304,51 @@ class Aggregator:
         return "evidência insuficiente"
 
     @classmethod
-    def aggregate(cls, result) -> dict:
+    def _normalize_component_weights(
+        cls,
+        bertimbau_score: float | None,
+    ) -> dict[str, float]:
+        weights = {
+            "evidence": max(0.0, cls.WEIGHTS.get("evidence", 0.60)),
+            "reputation": max(0.0, cls.WEIGHTS.get("reputation", 0.25)),
+        }
+
+        if bertimbau_score is not None:
+            weights["bertimbau"] = max(0.0, cls.WEIGHTS.get("bertimbau", 0.15))
+        else:
+            weights["bertimbau"] = 0.0
+
+        weight_sum = sum(weights.values())
+
+        if weight_sum <= 0:
+            weights = {"evidence": 0.70, "reputation": 0.30, "bertimbau": 0.0}
+            weight_sum = 1.0
+
+        return {key: round(value / weight_sum, 4) for key, value in weights.items()}
+
+    @classmethod
+    def aggregate(cls, result: Any) -> dict:
         evidence_score = cls._calculate_evidence_score(result)
         coverage_score = cls._calculate_coverage(result)
         reputation_score = cls._calculate_reputation_score(result)
+        bertimbau_score = cls._calculate_bertimbau_score(result)
         stance_stats = cls._calculate_stance_stats(result)
 
-        # Cobertura baixa reduz o componente de evidência,
-        # mas não transforma automaticamente a notícia em "não confiável".
+        # Cobertura baixa reduz o componente de evidência, mas não transforma
+        # automaticamente a notícia em "não confiável".
         evidence_component = evidence_score * coverage_score
 
-        weight_evidence = cls.WEIGHTS.get("evidence", 0.70)
-        weight_reputation = cls.WEIGHTS.get("reputation", 0.30)
-
-        weight_sum = weight_evidence + weight_reputation
-
-        if weight_sum <= 0:
-            weight_evidence = 0.70
-            weight_reputation = 0.30
-            weight_sum = 1.0
-
-        weight_evidence = weight_evidence / weight_sum
-        weight_reputation = weight_reputation / weight_sum
+        weights = cls._normalize_component_weights(bertimbau_score)
 
         final_score_0_1 = (
-            evidence_component * weight_evidence
-            + reputation_score * weight_reputation
+            evidence_component * weights["evidence"]
+            + reputation_score * weights["reputation"]
         )
 
-        final_score = round(final_score_0_1 * 100, 2)
+        if bertimbau_score is not None:
+            final_score_0_1 += bertimbau_score * weights["bertimbau"]
+
+        final_score = round(clamp(final_score_0_1) * 100, 2)
 
         label = cls._label_from_evidence(
             final_score=final_score,
@@ -283,6 +356,7 @@ class Aggregator:
             coverage_score=coverage_score,
             reputation_score=reputation_score,
             stance_stats=stance_stats,
+            bertimbau_score=bertimbau_score,
         )
 
         return {
@@ -293,6 +367,16 @@ class Aggregator:
                 "coverage_score": round(coverage_score * 100, 2),
                 "evidence_component": round(evidence_component * 100, 2),
                 "reputation_score": round(reputation_score * 100, 2),
+                "bertimbau_score": (
+                    round(bertimbau_score * 100, 2)
+                    if bertimbau_score is not None
+                    else None
+                ),
+                "bertimbau_status": (
+                    result.classification.get("status")
+                    if getattr(result, "classification", None)
+                    else None
+                ),
                 "stance_stats": stance_stats,
                 "min_valid_evidence_score": cls.MIN_VALID_EVIDENCE_SCORE,
                 "min_coverage_for_reliable": cls.MIN_COVERAGE_FOR_RELIABLE,
@@ -301,9 +385,6 @@ class Aggregator:
                 "min_contradiction_rate_for_unreliable": cls.MIN_CONTRADICTION_RATE_FOR_UNRELIABLE,
                 "excluded_evidence_layers": sorted(cls.EXCLUDED_EVIDENCE_LAYERS),
                 "excluded_source_types": sorted(cls.EXCLUDED_SOURCE_TYPES),
-                "weights": {
-                    "evidence": round(weight_evidence, 4),
-                    "reputation": round(weight_reputation, 4),
-                },
+                "weights": weights,
             },
         }
