@@ -21,13 +21,29 @@
 # =============================================================================
 
 from __future__ import annotations
-
 import logging
 from dataclasses import dataclass, field
-
+import os
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+def env_float(name: str, default: float) -> float:
+    """
+    Lê float do .env com fallback seguro.
+    """
+    value = os.getenv(name)
+
+    if value is None or value.strip() == "":
+        return default
+
+    try:
+        return float(value)
+    except ValueError:
+        logger.warning(
+            f"[env] valor inválido para {name}={value!r}; usando padrão {default}"
+        )
+        return default
 
 
 # =============================================================================
@@ -47,11 +63,14 @@ class EvidenceSimilarity:
     evidence_source:      str
     evidence_url:         str
     evidence_layer:       str           # "vector_store" | "wikipedia" | ...
+    source_type:          str
+    trusted_source:       bool
     published_at:         str | None
 
     similarity_retriever: float         # score original do retriever [0, 1]
     similarity_semantic:  float         # cosine similarity via embeddings [0, 1]
     similarity_final:     float         # score combinado [0, 1]
+    is_sufficient:        bool          # True se a evidência passou do corte mínimo de similaridade para ser considerada relevante
 
     rank:                 int           # posição no ranking (0 = mais similar)
 
@@ -75,6 +94,7 @@ class SimilarityResult:
     evidences:    list[EvidenceSimilarity]
     score:        float                     # [0, 1] — máximo das similaridades
     has_evidence: bool
+    has_sufficient_evidence: bool
 
 
 # =============================================================================
@@ -98,11 +118,15 @@ class SimilarityCalculator:
 
     # peso do score semântico vs score do retriever no score final
     # 0.7 → embeddings dominam; retriever é sinal de suporte
-    SEMANTIC_WEIGHT: float = 0.7
+    SEMANTIC_WEIGHT: float = env_float("HIBRIA_SIMILARITY_SEMANTIC_WEIGHT", 0.7)
 
-    # threshold mínimo de similarity_final para incluir no resultado
-    # evidências abaixo disso são descartadas como irrelevantes
-    MIN_SIMILARITY: float = 0.10
+    # threshold mínimo para manter uma evidência como candidata.
+    # Abaixo disso, o resultado é ruído e não deve ir para stance/aggregator.
+    MIN_SIMILARITY: float = env_float("HIBRIA_SIMILARITY_MIN_SCORE", 0.25)
+
+    # threshold mínimo para considerar que a claim possui evidência suficiente.
+    # Esse valor deve conversar com o retriever e com o aggregator.
+    MIN_SUFFICIENT_SIMILARITY: float = env_float("HIBRIA_SIMILARITY_MIN_SUFFICIENT", 0.55)
 
     # máximo de evidências por claim no resultado final
     # reduz ruído para o stance_model e aggregator
@@ -212,12 +236,13 @@ class SimilarityCalculator:
             logger.warning("[similarity] sem evidências para calcular")
             return [
                 SimilarityResult(
-                    claim_id     = c.claim_id,
-                    claim_text   = c.text,
-                    top_evidence = None,
-                    evidences    = [],
-                    score        = 0.0,
-                    has_evidence = False,
+                    claim_id                 = c.claim_id,
+                    claim_text               = c.text,
+                    top_evidence             = None,
+                    evidences                = [],
+                    score                    = 0.0,
+                    has_evidence             = False,
+                    has_sufficient_evidence  = False,
                 )
                 for c in claims
             ]
@@ -244,12 +269,13 @@ class SimilarityCalculator:
 
             if not claim or not retrieval or not retrieval.evidences:
                 results.append(SimilarityResult(
-                    claim_id     = claim_id,
-                    claim_text   = claim.text if claim else "",
-                    top_evidence = None,
-                    evidences    = [],
-                    score        = 0.0,
-                    has_evidence = False,
+                    claim_id                 = claim_id,
+                    claim_text               = claim.text if claim else "",
+                    top_evidence             = None,
+                    evidences                = [],
+                    score                    = 0.0,
+                    has_evidence             = False,
+                    has_sufficient_evidence  = False,
                 ))
                 continue
 
@@ -276,15 +302,20 @@ class SimilarityCalculator:
                 if final_score < cls.MIN_SIMILARITY:
                     continue
 
+                is_sufficient = final_score >= cls.MIN_SUFFICIENT_SIMILARITY
+
                 ev_similarities.append(EvidenceSimilarity(
                     evidence_text        = ev.text,
                     evidence_source      = ev.source,
                     evidence_url         = ev.url,
                     evidence_layer       = ev.retrieval_layer,
+                    source_type          = getattr(ev, "source_type", "external_document"),
+                    trusted_source       = bool(getattr(ev, "trusted_source", False)),
                     published_at         = ev.published_at,
                     similarity_retriever = ev.similarity,
                     similarity_semantic  = round(semantic_score, 4),
                     similarity_final     = final_score,
+                    is_sufficient        = is_sufficient,
                     rank                 = 0,  # atualizado abaixo
                 ))
 
@@ -299,24 +330,32 @@ class SimilarityCalculator:
             # score do claim = similaridade da evidência mais próxima
             # representa "quão bem suportado é este claim por evidências externas"
             score = top_evidence.similarity_final if top_evidence else 0.0
+            has_sufficient_evidence = any(
+                evidence.is_sufficient for evidence in ev_similarities
+            )
 
             results.append(SimilarityResult(
-                claim_id     = claim_id,
-                claim_text   = claim.text,
-                top_evidence = top_evidence,
-                evidences    = ev_similarities,
-                score        = round(score, 4),
-                has_evidence = bool(ev_similarities),
+                claim_id                 = claim_id,
+                claim_text               = claim.text,
+                top_evidence             = top_evidence,
+                evidences                = ev_similarities,
+                score                    = round(score, 4),
+                has_evidence             = bool(ev_similarities),
+                has_sufficient_evidence  = has_sufficient_evidence,
             ))
 
         # ── log resumido ──────────────────────────────────────────────────────
         has_evidence_count = sum(1 for r in results if r.has_evidence)
+        has_sufficient_count = sum(1 for r in results if r.has_sufficient_evidence)
+
         avg_score = (
             sum(r.score for r in results) / len(results)
             if results else 0.0
         )
+
         logger.info(
-            f"[similarity] {has_evidence_count}/{len(results)} claims com evidência · "
+            f"[similarity] {has_evidence_count}/{len(results)} claims com candidato · "
+            f"{has_sufficient_count}/{len(results)} com evidência suficiente · "
             f"score médio: {avg_score:.3f}"
         )
 
@@ -338,14 +377,18 @@ def similarity_results_to_dict(results: list[SimilarityResult]) -> list[dict]:
             "claim_text":   r.claim_text,
             "score":        r.score,
             "has_evidence": r.has_evidence,
+            "has_sufficient_evidence": r.has_sufficient_evidence,
             "top_evidence": {
                 "text":                 r.top_evidence.evidence_text[:200],
                 "source":               r.top_evidence.evidence_source,
                 "url":                  r.top_evidence.evidence_url,
                 "layer":                r.top_evidence.evidence_layer,
+                "source_type":          r.top_evidence.source_type,
+                "trusted_source":       r.top_evidence.trusted_source,
                 "similarity_semantic":  r.top_evidence.similarity_semantic,
                 "similarity_retriever": r.top_evidence.similarity_retriever,
                 "similarity_final":     r.top_evidence.similarity_final,
+                "is_sufficient":        r.top_evidence.is_sufficient,
             } if r.top_evidence else None,
             "evidences": [
                 {
@@ -354,10 +397,13 @@ def similarity_results_to_dict(results: list[SimilarityResult]) -> list[dict]:
                     "source":                e.evidence_source,
                     "url":                   e.evidence_url,
                     "layer":                 e.evidence_layer,
+                    "source_type":           e.source_type,
+                    "trusted_source":        e.trusted_source,
                     "published_at":          e.published_at,
                     "similarity_semantic":   e.similarity_semantic,
                     "similarity_retriever":  e.similarity_retriever,
                     "similarity_final":      e.similarity_final,
+                    "is_sufficient":         e.is_sufficient,
                 }
                 for e in r.evidences
             ],
