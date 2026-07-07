@@ -117,7 +117,7 @@ class PipelineResult:
     classification: dict | None = None
     # ex: {"label": "fake", "score": 0.87, "probabilities": {...}}
 
-    # ── text_features (pendente) ──────────────────────────────────────────────
+    # ── text_features ────────────────────────────────────────────────────────
     text_features: dict | None = None
     # ex: {"sensationalism": 0.4, "emotional_language": 0.6, ...}
 
@@ -575,15 +575,38 @@ class HibriaPipeline:
     @staticmethod
     def _step_text_features(result: PipelineResult) -> PipelineResult:
         """
-        🔲 PENDENTE: text_features.py
-        Extrai características linguísticas: sensacionalismo,
-        linguagem emocional, vocabulário, estrutura sintática.
+        Etapa 9: extração de características linguísticas e estruturais.
+
+        text_features.py → sinais textuais auxiliares para aggregator e
+        explanation_generator. Esta etapa não decide verdade/falsidade; ela
+        mede risco linguístico, como sensacionalismo, clickbait, subjetividade,
+        pontuação enfática e presença de atribuições/dados verificáveis.
         """
-        # TODO: implementar
-        # from pipeline.analysis.text_features import TextFeatureExtractor
-        # result.text_features = TextFeatureExtractor.extract(
-        #     result.blocks_clean,
-        # )
+        from pipeline.analysis.text_features import TextFeatureExtractor
+
+        result.text_features = TextFeatureExtractor.extract(
+            result.blocks_clean,
+            title=result.title,
+            description=result.description,
+            sentences=result.sentences or [],
+            claims=result.claims or [],
+        )
+
+        status = result.text_features.get("status")
+        label = result.text_features.get("label", "indefinido")
+        score = result.text_features.get("score")
+        risk = result.text_features.get("risk_score")
+
+        if status == "ok":
+            logger.info(
+                f"[text_features] label={label} · "
+                f"score={score} · risk={risk}"
+            )
+        else:
+            message = result.text_features.get("message", "sem detalhes")
+            result.warnings.append(f"[text_features] {status}: {message}")
+            logger.warning(f"[text_features] {status}: {message}")
+
         return result
 
     @staticmethod
@@ -701,6 +724,7 @@ class HibriaPipeline:
             ("similarity", cls._step_similarity),
             ("stance", cls._step_stance),
             ("bertimbau", cls._step_bertimbau),
+            ("text_features", cls._step_text_features),
             ("reputation", cls._step_reputation),
             ("aggregator", cls._step_aggregate),
             ("auto_indexer", cls._step_auto_index),
@@ -708,7 +732,6 @@ class HibriaPipeline:
 
         # ── steps pendentes ───────────────────────────────────────────────────
         steps_pending = [
-            ("text_features", cls._step_text_features),
             ("explanation", cls._step_explain),
             ("formatter", cls._step_format),
         ]
@@ -760,8 +783,9 @@ class HibriaPipeline:
         insuficiente em relação à claim. O resultado ainda não altera o score
         final nesta versão; ele apenas enriquece a saída do pipeline.
         """
-        result.stance_results = StanceModel.analyze_retrieval_results(
-            result.retrieval_results or []
+        result.stance_results = StanceModel.analyze(
+            retrieval_results=result.retrieval_results or [],
+            similarity_scores=result.similarity_scores or [],
         )
 
         logger.info(
