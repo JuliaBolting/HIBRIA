@@ -21,7 +21,7 @@ from pipeline.pipeline import HibriaPipeline
 from pipeline.preprocessing.extractor import ExtractionError
 
 OUTPUT_PATH = Path(__file__).parent.parent / "extension" / "public" / "output.json"
-URL = "https://g1.globo.com/trabalho-e-carreira/noticia/2026/06/10/sem-solucao-a-bola-nao-rola-professores-pedem-aumento-de-100percent-em-protestos-contra-a-copa-no-mexico.ghtml"
+URL = "https://ndmais.com.br/economia/negocios/sorveteria-de-60-anos-fecha-para-mudanca-historica-em-blumenau/"
 
 try:
     result = HibriaPipeline.run(URL)
