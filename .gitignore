@@ -1,39 +1,151 @@
-# Ambiente virtual
+# =============================================================================
+# AMBIENTE VIRTUAL
+# =============================================================================
 .venv/
 venv/
 env/
+ENV/
 
-# Arquivos de compilação Python
+# =============================================================================
+# PYTHON
+# =============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Arquivos do Django
+# =============================================================================
+# CONFIGURAÇÕES LOCAIS / SEGREDOS
+# =============================================================================
+.env
+*.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Mantém exemplos versionáveis
+!.env.example
+!.env.reputation.example
+
+# =============================================================================
+# LOGS
+# =============================================================================
 *.log
+logs/
+log/
+
+# =============================================================================
+# BANCO DE DADOS LOCAL
+# =============================================================================
 db.sqlite3
+*.sqlite3
+*.db
+
+# =============================================================================
+# DJANGO / BACK-END
+# =============================================================================
 media/
 staticfiles/
 *.pot
-*.pyc
 
-# Configurações locais
-*.env
-.env.local
-.env.production
-.DS_Store
+# =============================================================================
+# FASTAPI / SERVIDOR LOCAL
+# =============================================================================
+.cache/
+tmp/
+temp/
+uploads/
 
+# =============================================================================
+# DATASETS E BASES LOCAIS
+# =============================================================================
+data/datasets/
+data/raw/
+data/processed/
 
-# VSCode / IDEs
-.vscode/
-.idea/
-*.swp
+# Caso queira versionar apenas arquivos explicativos das pastas de dados
+!data/datasets/.gitkeep
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/datasets/README.md
 
-# Cache do Tailwind e Node
+# =============================================================================
+# FAISS / EMBEDDINGS / ÍNDICES VETORIAIS
+# =============================================================================
+*.faiss
+*.index
+*.pkl
+*.pickle
+vector_store/
+faiss_index/
+indexes/
+embeddings/
+
+# =============================================================================
+# MODELOS BAIXADOS / CACHE DE IA
+# =============================================================================
+models/
+model_cache/
+.huggingface/
+.cache/huggingface/
+torch_cache/
+transformers_cache/
+
+# =============================================================================
+# CACHE E RESULTADOS DA HÍBRIA
+# =============================================================================
+reputation_cache.json
+reputation_cache/
+analysis_cache/
+pipeline_cache/
+extension/public/output.json
+extension/public/debug_output.json
+
+# =============================================================================
+# CRAWLERS / PLAYWRIGHT / CRAWLEE
+# =============================================================================
+CRAWLEE_STORAGE/
+CROWLEE_STORAGE/
+playwright-report/
+test-results/
+
+# =============================================================================
+# NODE / FRONT-END / EXTENSÃO
+# =============================================================================
 node_modules/
 dist/
 build/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Arquivos temporários do sistema
+# =============================================================================
+# VSCODE / IDES
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =============================================================================
+# SISTEMA OPERACIONAL
+# =============================================================================
+.DS_Store
 Thumbs.db
+desktop.ini
+
+# =============================================================================
+# ARQUIVOS TEMPORÁRIOS
+# =============================================================================
+*.tmp
+*.temp
+*.bak
+*.old
