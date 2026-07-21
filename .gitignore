@@ -119,7 +119,6 @@ test-results/
 # NODE / FRONT-END / EXTENSÃO
 # =============================================================================
 node_modules/
-dist/
 build/
 coverage/
 npm-debug.log*

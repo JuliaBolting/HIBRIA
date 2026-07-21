@@ -20,7 +20,7 @@ print("Modelos prontos.\n")
 from pipeline.pipeline import HibriaPipeline
 from pipeline.preprocessing.extractor import ExtractionError
 
-OUTPUT_PATH = Path(__file__).parent.parent / "extension" / "public" / "output.json"
+OUTPUT_PATH = Path(__file__).parent.parent / "extension" / "dist" / "output.json"
 URL = "https://ndmais.com.br/economia/negocios/sorveteria-de-60-anos-fecha-para-mudanca-historica-em-blumenau/"
 
 try:
