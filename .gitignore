@@ -107,9 +107,13 @@ analysis_cache/
 pipeline_cache/
 extension/public/output.json
 extension/public/debug_output.json
+extension/dist/*.json
 
 # Base local gerada de reputação
 ai-engine/data/reputation/source_reputation.json
+ai-engine/data/runtime/*.json
+
+
 
 # =============================================================================
 # CRAWLERS / PLAYWRIGHT / CRAWLEE
