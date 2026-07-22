@@ -63,17 +63,17 @@ temp/
 uploads/
 
 # =============================================================================
-# DATASETS E BASES LOCAIS
+# DATASETS LOCAIS
 # =============================================================================
-data/datasets/
-data/raw/
-data/processed/
+ai-engine/data/datasets/
+ai-engine/data/raw/
+ai-engine/data/processed/
 
-# Caso queira versionar apenas arquivos explicativos das pastas de dados
-!data/datasets/.gitkeep
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/datasets/README.md
+# O resultado da reputação não é ignorado: ele é a base persistente gerada uma
+# única vez pelo script e poderá ser versionado/importado no PostgreSQL futuro.
+!ai-engine/data/reputation/
+!ai-engine/data/reputation/source_reputation.json
+!ai-engine/data/reputation/README.md
 
 # =============================================================================
 # FAISS / EMBEDDINGS / ÍNDICES VETORIAIS
@@ -102,10 +102,14 @@ transformers_cache/
 # =============================================================================
 reputation_cache.json
 reputation_cache/
+ai-engine/data/reputation/*.tmp
 analysis_cache/
 pipeline_cache/
 extension/public/output.json
 extension/public/debug_output.json
+
+# Base local gerada de reputação
+ai-engine/data/reputation/source_reputation.json
 
 # =============================================================================
 # CRAWLERS / PLAYWRIGHT / CRAWLEE
@@ -119,6 +123,7 @@ test-results/
 # NODE / FRONT-END / EXTENSÃO
 # =============================================================================
 node_modules/
+dist/
 build/
 coverage/
 npm-debug.log*

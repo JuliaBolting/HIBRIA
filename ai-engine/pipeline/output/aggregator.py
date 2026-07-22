@@ -175,14 +175,24 @@ class Aggregator:
         return round(with_valid_evidence / total, 4)
 
     @staticmethod
-    def _calculate_reputation_score(result: Any) -> float:
+    def _calculate_reputation_score(result: Any) -> float | None:
         """
-        Recupera o score de reputação calculado pelo reputation_engine.py.
-        """
-        if not result.reputation:
-            return 0.0
+        Usa reputação somente quando a fonte recebeu uma avaliação completa.
 
-        return clamp(float(result.reputation.get("score", 0.0)))
+        Resultado insuficiente, falho ou ainda não avaliado não é convertido em
+        reputação baixa. Nesses casos o componente é retirado do peso final.
+        """
+        reputation = getattr(result, "reputation", None)
+        if not reputation or not isinstance(reputation, dict):
+            return None
+
+        if reputation.get("status") != "evaluated" or reputation.get("note") is None:
+            return None
+
+        try:
+            return clamp(float(reputation.get("score")))
+        except (TypeError, ValueError):
+            return None
 
     @staticmethod
     def _calculate_bertimbau_score(result: Any) -> float | None:
@@ -259,7 +269,7 @@ class Aggregator:
         final_score: float,
         evidence_score: float,
         coverage_score: float,
-        reputation_score: float,
+        reputation_score: float | None,
         stance_stats: dict,
         bertimbau_score: float | None,
     ) -> str:
@@ -282,7 +292,7 @@ class Aggregator:
             return "não confiável"
 
         if coverage_score == 0 or evidence_score == 0:
-            if reputation_score >= 0.80:
+            if reputation_score is not None and reputation_score >= 0.80:
                 return "evidência insuficiente"
             if bertimbau_score is not None and final_score >= 60:
                 return "não verificado"
@@ -307,21 +317,25 @@ class Aggregator:
     def _normalize_component_weights(
         cls,
         bertimbau_score: float | None,
+        reputation_score: float | None,
     ) -> dict[str, float]:
         weights = {
             "evidence": max(0.0, cls.WEIGHTS.get("evidence", 0.60)),
-            "reputation": max(0.0, cls.WEIGHTS.get("reputation", 0.25)),
+            "reputation": (
+                max(0.0, cls.WEIGHTS.get("reputation", 0.25))
+                if reputation_score is not None
+                else 0.0
+            ),
+            "bertimbau": (
+                max(0.0, cls.WEIGHTS.get("bertimbau", 0.15))
+                if bertimbau_score is not None
+                else 0.0
+            ),
         }
 
-        if bertimbau_score is not None:
-            weights["bertimbau"] = max(0.0, cls.WEIGHTS.get("bertimbau", 0.15))
-        else:
-            weights["bertimbau"] = 0.0
-
         weight_sum = sum(weights.values())
-
         if weight_sum <= 0:
-            weights = {"evidence": 0.70, "reputation": 0.30, "bertimbau": 0.0}
+            weights = {"evidence": 1.0, "reputation": 0.0, "bertimbau": 0.0}
             weight_sum = 1.0
 
         return {key: round(value / weight_sum, 4) for key, value in weights.items()}
@@ -338,11 +352,11 @@ class Aggregator:
         # automaticamente a notícia em "não confiável".
         evidence_component = evidence_score * coverage_score
 
-        weights = cls._normalize_component_weights(bertimbau_score)
+        weights = cls._normalize_component_weights(bertimbau_score, reputation_score)
 
         final_score_0_1 = (
             evidence_component * weights["evidence"]
-            + reputation_score * weights["reputation"]
+            + (reputation_score or 0.0) * weights["reputation"]
         )
 
         if bertimbau_score is not None:
@@ -366,7 +380,16 @@ class Aggregator:
                 "evidence_score": round(evidence_score * 100, 2),
                 "coverage_score": round(coverage_score * 100, 2),
                 "evidence_component": round(evidence_component * 100, 2),
-                "reputation_score": round(reputation_score * 100, 2),
+                "reputation_score": (
+                    round(reputation_score * 100, 2)
+                    if reputation_score is not None
+                    else None
+                ),
+                "reputation_status": (
+                    result.reputation.get("status")
+                    if getattr(result, "reputation", None)
+                    else None
+                ),
                 "bertimbau_score": (
                     round(bertimbau_score * 100, 2)
                     if bertimbau_score is not None
