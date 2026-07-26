@@ -34,6 +34,13 @@ class SourceReputationRepository:
         return "postgresql" if self.database_url else "json"
 
     def init_schema(self) -> dict[str, Any]:
+        """
+        Inicializa o esquema de banco de dados para armazenar a reputação.
+
+        Executa as migrations SQL encontradas em database/migrations/*.sql e
+        verifica se as tabelas foram realmente criadas após a execução.
+        Retorna initialized=False com detalhes do erro se alguma tabela falhar.
+        """
         if not self.database_url:
             data = self._read_json()
             self._write_json(data)
@@ -52,14 +59,44 @@ class SourceReputationRepository:
                 f"Nenhuma migração SQL foi encontrada em {migrations_dir}"
             )
 
+        EXPECTED_TABLES = {
+            "fontes_reputacao",
+            "aliases_fontes_reputacao",
+            "criterios_reputacao_fonte",
+            "evidencias_reputacao_fonte",
+            "execucoes_avaliacao_reputacao",
+        }
+
         with psycopg2.connect(self.database_url) as connection:
             with connection.cursor() as cursor:
                 for migration in migrations:
                     cursor.execute(migration.read_text(encoding="utf-8"))
+
+                # verifica se as tabelas foram realmente criadas
+                # evita retornar initialized=True quando o SQL falhou silenciosamente
+                cursor.execute("""
+                    SELECT tablename
+                    FROM pg_tables
+                    WHERE schemaname = 'public'
+                    AND tablename = ANY(%s)
+                """, (list(EXPECTED_TABLES),))
+
+                created = {row[0] for row in cursor.fetchall()}
+                missing = EXPECTED_TABLES - created
+
+        if missing:
+            return {
+                "initialized": False,
+                "backend": "postgresql",
+                "migrations": [item.name for item in migrations],
+                "error": f"tabelas não criadas: {sorted(missing)}",
+            }
+
         return {
             "initialized": True,
             "backend": "postgresql",
             "migrations": [item.name for item in migrations],
+            "tables_verified": sorted(created),
         }
 
     def get_by_domain_or_alias(self, domain: str) -> SourceReputation | None:
