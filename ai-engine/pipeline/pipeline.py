@@ -1,20 +1,13 @@
 # =============================================================================
-# pipeline.py
 # Orquestrador central do sistema HÍBRIA.
 #
-# Conecta todos os módulos implementados em sequência, passando o
-# PipelineResult entre as etapas. Módulos ainda não implementados
-# estão documentados como pendentes — o pipeline continua funcionando
-# parcialmente sem eles.
+# Conecta os módulos em sequência por meio de PipelineResult.
 #
-# Fluxo atual (implementado):
-#   extractor → cleaner → normalizer → segmentation →
-#   claim_detector → retriever (VectorStore/FAISS) → similarity
-#
-# Fluxo completo (TCC):
-#   + similarity → stance_model → bertimbau_classifier →
-#   + text_features → reputation_engine → aggregator →
-#   + explanation_generator → response_formatter
+# Fluxo principal:
+#   extractor → cleaner → normalizer → segmentation → claim_detector →
+#   retriever/RAG → similarity → stance_model → bertimbau_classifier →
+#   text_features → source_reputation_service → aggregator → auto_indexer →
+#   explanation_generator → response_formatter
 # =============================================================================
 
 from __future__ import annotations
@@ -71,8 +64,7 @@ def env_flag(name: str, default: bool = False) -> bool:
 # Contrato de dados entre todas as etapas do pipeline.
 #
 # Cada módulo lê o que precisa e escreve no seu campo.
-# Campos ainda não implementados ficam como None — o pipeline
-# continua funcionando parcialmente enquanto o projeto cresce.
+# Campos opcionais permanecem como None quando uma etapa não produz resultado.
 # =============================================================================
 
 
@@ -107,13 +99,13 @@ class PipelineResult:
     # ── retriever ─────────────────────────────────────────────────────────────
     retrieval_results: list | None = None  # list[RetrievalResult]
 
-    # ── similarity (pendente) ─────────────────────────────────────────────────
+    # ── similarity ────────────────────────────────────────────────────────────
     similarity_scores: list | None = None
 
-    # ── stance_model (pendente) ───────────────────────────────────────────────
+    # ── stance_model ──────────────────────────────────────────────────────────
     stance_results: list | None = None
 
-    # ── bertimbau_classifier (pendente) ───────────────────────────────────────
+    # ── bertimbau_classifier ─────────────────────────────────────────────────
     classification: dict | None = None
     # ex: {"label": "fake", "score": 0.87, "probabilities": {...}}
 
@@ -121,11 +113,11 @@ class PipelineResult:
     text_features: dict | None = None
     # ex: {"sensationalism": 0.4, "emotional_language": 0.6, ...}
 
-    # ── reputation_engine (pendente) ──────────────────────────────────────────
+    # ── reputação da fonte ───────────────────────────────────────────────────
     reputation: dict | None = None
-    # ex: {"domain": "g1.globo.com", "score": 0.95, "category": "confiável"}
+    # ex: {"status": "evaluated", "domain": "...", "note": 86, "score": 0.86}
 
-    # ── aggregator (pendente) ─────────────────────────────────────────────────
+    # ── aggregator ────────────────────────────────────────────────────────────
     score_final: float | None = None  # 0.0 a 100.0
     label_final: str | None = (
         None  # "confiável" | "parcialmente confiável" | "não confiável"
@@ -295,7 +287,7 @@ class PipelineResult:
                 if self.similarity_scores
                 else None
             ),
-            # resultados de análise (pendentes — None até implementar)
+            # resultados das etapas de análise
             "stance_results": [
                 item.to_dict() if hasattr(item, "to_dict") else item
                 for item in (self.stance_results or [])
@@ -303,7 +295,7 @@ class PipelineResult:
             "classification": self.classification,
             "text_features": self.text_features,
             "reputation": self.reputation,
-            # resultado final (pendente)
+            # resultado agregado
             "score_final": self.score_final,
             "label_final": self.label_final,
             "score_breakdown": self.score_breakdown,
@@ -612,16 +604,24 @@ class HibriaPipeline:
     @staticmethod
     def _step_reputation(result: PipelineResult) -> PipelineResult:
         """
-        Etapa 8: avaliação de reputação da fonte.
-        reputation_engine.py → domínio da URL → score de reputação.
-        """
-        from pipeline.analysis.reputation_engine import ReputationEngine
+        Avalia a reputação da fonte por um serviço único e genérico.
 
-        result.reputation = ReputationEngine.evaluate(result.url)
+        Se o domínio já estiver persistido, reutiliza a avaliação. Caso contrário,
+        pesquisa os critérios na web, calcula a nota e salva a fonte para as
+        próximas análises. Não existem notas ou domínios definidos no código.
+        """
+        from pipeline.analysis.reputation.service import SourceReputationService
+
+        reputation = SourceReputationService().get_or_evaluate(
+            result.url,
+            trigger="pipeline",
+        )
+        result.reputation = reputation.to_dict()
 
         logger.info(
-            f"[reputation] domínio={result.reputation['domain']} · "
-            f"score={result.reputation['score']}"
+            f"[reputation] domínio={result.reputation.get('canonical_domain') or result.reputation.get('domain')} · "
+            f"status={result.reputation.get('status')} · "
+            f"nota={result.reputation.get('note')}"
         )
 
         return result
@@ -730,7 +730,7 @@ class HibriaPipeline:
             ("auto_indexer", cls._step_auto_index),
         ]
 
-        # ── steps pendentes ───────────────────────────────────────────────────
+        # ── etapas de saída ainda incrementais ─────────────────────────────────
         steps_pending = [
             ("explanation", cls._step_explain),
             ("formatter", cls._step_format),
