@@ -1,0 +1,1056 @@
+/* =========================================================
+   VARIÁVEIS
+   ========================================================= */
+
+:root {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  color: #111827;
+  background: #eef0f4;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --background: #eef0f4;
+  --surface: #f8fafc;
+  --surface-strong: #ffffff;
+  --surface-muted: #e3e7ee;
+
+  --text: #111827;
+  --muted: #64748b;
+
+  --border: rgba(15, 23, 42, 0.08);
+
+  --shadow-edge: #090b10;
+
+  --button-muted: #bcc2ca;
+}
+
+
+/* =========================================================
+   TEMA ESCURO
+   ========================================================= */
+
+:root[data-theme="dark"] {
+  color: #f8fafc;
+  background: #070b15;
+
+  --background: #070b15;
+  --surface: #111827;
+  --surface-strong: #141d2e;
+  --surface-muted: #1a2437;
+
+  --text: #f8fafc;
+  --muted: #94a3b8;
+
+  --border: rgba(148, 163, 184, 0.06);
+
+  --shadow-edge: #02040a;
+
+  --button-muted: #20304d;
+}
+
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+
+  min-width: 0;
+  min-height: 0;
+
+  width: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  background: var(--background);
+}
+
+button {
+  font: inherit;
+}
+
+
+/* =========================================================
+   CONTAINER PRINCIPAL
+   ========================================================= */
+
+.app-shell {
+  position: relative;
+
+  width: 368px;
+
+  overflow: hidden;
+
+  color: var(--text);
+  background: var(--background);
+
+  /*
+   * Bordas retas.
+   * Não usamos border-radius aqui porque o popup
+   * do protótipo possui cantos retos.
+   */
+  border-radius: 0;
+
+  transition:
+    color 0.18s ease,
+    background 0.18s ease;
+}
+
+
+/*
+ * Loading e resultado utilizam o espaço maior
+ * do protótipo.
+ */
+
+.app-shell.view-loading,
+.app-shell.view-result {
+  width: 420px;
+}
+
+
+/* =========================================================
+   CONTROLES SUPERIORES
+   ========================================================= */
+
+.header-controls {
+  position: absolute;
+
+  z-index: 10;
+
+  top: 14px;
+  right: 14px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 7px;
+}
+
+
+/* =========================================================
+   BOTÃO TEMA
+   ========================================================= */
+
+.theme-button {
+  display: flex;
+
+  width: 25px;
+  height: 25px;
+
+  padding: 0;
+
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+
+  border: 0;
+  border-radius: 4px;
+
+  background: transparent;
+}
+
+
+/*
+ * Sol e lua possuem exatamente a mesma
+ * área visual.
+ */
+
+.theme-icon {
+  display: block;
+
+  width: 20px;
+  height: 20px;
+
+  object-fit: contain;
+}
+
+
+/* =========================================================
+   BOTÃO FECHAR
+   ========================================================= */
+
+.close-button {
+  width: 20px;
+  height: 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+  margin: 0;
+
+  border: 0;
+  border-radius: 4px;
+
+  background: var(--surface-muted);
+
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.close-button img {
+  display: block;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+/* =========================================================
+   BASE DAS TELAS
+   ========================================================= */
+
+.screen {
+  position: relative;
+}
+
+
+/* =========================================================
+   TELA HOME
+   ========================================================= */
+
+.screen-home {
+  display: flex;
+
+  width: 368px;
+  height: 344px;
+
+  padding:
+    30px
+    32px
+    36px;
+
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+
+/* =========================================================
+   MARCA
+   ========================================================= */
+
+.brand {
+  margin-bottom: 40px;
+
+  text-align: center;
+}
+
+
+/*
+ * Logo principal.
+ */
+
+.logo {
+  display: block;
+
+  width: 104px;
+  height: 104px;
+
+  margin:
+    0
+    auto
+    -5px;
+
+  object-fit: contain;
+}
+
+
+/*
+ * Logo pequeno utilizado nas telas
+ * de loading e resultado.
+ */
+
+.logo-compact {
+  position: absolute;
+
+  top: 14px;
+  left: 16px;
+
+  width: 57px;
+  height: 57px;
+
+  margin: 0;
+
+  object-fit: contain;
+}
+
+
+/* =========================================================
+   TÍTULO HOME
+   ========================================================= */
+
+.brand h1 {
+  margin:
+    0
+    0
+    12px;
+
+  font-family:
+    "Roboto Mono",
+    Consolas,
+    monospace;
+
+  font-size: 27px;
+  font-weight: 700;
+
+  line-height: 1;
+
+  letter-spacing: -0.7px;
+
+  color: var(--text);
+}
+
+
+.brand p {
+  margin: 3px 0;
+
+  color: var(--muted);
+
+  font-size: 15px;
+  font-weight: 600;
+
+  line-height: 1.45;
+}
+
+
+/* =========================================================
+   BOTÃO PRINCIPAL
+   ========================================================= */
+
+.primary-button,
+.stop-button,
+.new-analysis-button {
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  cursor: pointer;
+
+  border-radius: 999px;
+
+  font-weight: 700;
+
+  transition:
+    transform 0.12s ease,
+    filter 0.12s ease;
+}
+
+
+.primary-button {
+  min-height: 58px;
+
+  color: #ffffff;
+
+  background:
+    linear-gradient(
+      100deg,
+      #655df5,
+      #586ff0 36%,
+      #06bad1
+    );
+
+  border: 0;
+
+  font-size: 18px;
+}
+
+
+.primary-button:hover,
+.stop-button:hover,
+.new-analysis-button:hover {
+  filter: brightness(1.06);
+}
+
+
+.primary-button:active,
+.stop-button:active,
+.new-analysis-button:active {
+  transform: translateY(1px);
+}
+
+
+/* =========================================================
+   ERRO
+   ========================================================= */
+
+.error-message {
+  width: 100%;
+
+  margin-top: 12px;
+  padding: 8px 10px;
+
+  color: #ef4444;
+
+  background: rgba(239, 68, 68, 0.1);
+
+  border:
+    1px solid
+    rgba(239, 68, 68, 0.35);
+
+  border-radius: 6px;
+
+  font-size: 11px;
+
+  text-align: center;
+}
+
+
+/* =========================================================
+   TELA LOADING
+   ========================================================= */
+
+.screen-loading {
+  display: flex;
+
+  width: 420px;
+  height: 562px;
+
+  padding:
+    96px
+    28px
+    26px;
+
+  flex-direction: column;
+}
+
+
+/* =========================================================
+   CABEÇALHO LOADING
+   ========================================================= */
+
+.loading-content {
+  width: 100%;
+
+  display: flex;
+
+  flex-direction: column;
+  align-items: center;
+
+  text-align: center;
+}
+
+
+/* =========================================================
+   PONTOS
+   ========================================================= */
+
+.thinking-dots {
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 9px;
+
+  margin-bottom: 16px;
+}
+
+
+.thinking-dots i {
+  display: block;
+
+  width: 8px;
+  height: 8px;
+
+  background: #9b5de5;
+
+  border-radius: 50%;
+
+  animation:
+    bounce
+    0.9s
+    ease-in-out
+    infinite;
+}
+
+
+.thinking-dots i:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.thinking-dots i:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dots i:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+
+@keyframes bounce {
+  0%,
+  65%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+
+  30% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+
+/* =========================================================
+   TÍTULO LOADING
+   ========================================================= */
+
+.loading-content h1 {
+  margin:
+    0
+    0
+    18px;
+
+  color: var(--text);
+
+  font-family:
+    "Roboto Mono",
+    Consolas,
+    monospace;
+
+  font-size: 20px;
+
+  font-weight: 700;
+
+  line-height: 1;
+}
+
+
+/* =========================================================
+   STATUS ATUAL
+   ========================================================= */
+
+.loading-status {
+  margin: 0;
+
+  color: var(--muted);
+
+  font-size: 15px;
+
+  font-weight: 500;
+
+  line-height: 1.3;
+}
+
+
+/* =========================================================
+   LISTA DE ETAPAS
+   ========================================================= */
+
+.steps {
+  display: grid;
+
+  gap: 9px;
+
+  width: 100%;
+
+  margin:
+    24px
+    0
+    0;
+
+  padding: 0;
+
+  list-style: none;
+}
+
+
+.steps li {
+  display: flex;
+
+  min-height: 39px;
+
+  padding:
+    0
+    10px;
+
+  align-items: center;
+
+  color: var(--muted);
+
+  background: var(--surface-muted);
+
+  border-radius: 5px;
+
+  font-size: 14px;
+
+  transition:
+    color 0.18s ease,
+    background 0.18s ease;
+}
+
+
+/*
+ * Etapa ativa.
+ */
+
+.steps li.active {
+  color: var(--text);
+
+  background:
+    color-mix(
+      in srgb,
+      var(--step-color) 35%,
+      var(--surface-muted)
+    );
+}
+
+
+/*
+ * Etapas concluídas.
+ */
+
+.steps li.done {
+  color: var(--muted);
+
+  opacity: 0.76;
+}
+
+
+/* =========================================================
+   ÍCONE DAS ETAPAS
+   ========================================================= */
+
+.step-icon {
+  display: flex;
+
+  width: 27px;
+  height: 27px;
+
+  flex: 0 0 27px;
+
+  margin-right: 9px;
+
+  align-items: center;
+  justify-content: center;
+
+  background:
+    color-mix(
+      in srgb,
+      var(--step-color) 20%,
+      transparent
+    );
+
+  border-radius: 50%;
+}
+
+
+.step-icon img {
+  display: block;
+
+  width: 18px;
+  height: 18px;
+
+  object-fit: contain;
+}
+
+
+/*
+ * O texto não deve quebrar desnecessariamente.
+ */
+
+.step-label {
+  flex: 1;
+
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   BOTÃO PARAR
+   ========================================================= */
+
+.stop-button {
+  min-height: 45px;
+
+  margin-top: auto;
+
+  color: #ef4444;
+
+  background:
+    rgba(239, 68, 68, 0.14);
+
+  border:
+    1px solid
+    rgba(239, 68, 68, 0.65);
+
+  font-size: 15px;
+}
+
+
+.stop-icon {
+  display: block;
+
+  width: 18px;
+  height: 18px;
+
+  object-fit: contain;
+}
+
+
+/* =========================================================
+   TELA RESULTADO
+   ========================================================= */
+
+.screen-result {
+  display: flex;
+
+  width: 420px;
+  height: 638px;
+
+  padding:
+    58px
+    25px
+    24px;
+
+  flex-direction: column;
+  align-items: center;
+}
+
+
+/* =========================================================
+   SCORE
+   ========================================================= */
+
+.score-ring {
+  --angle:
+    calc(
+      var(--score) * 3.6deg
+    );
+
+  position: relative;
+
+  display: grid;
+
+  width: 133px;
+  height: 133px;
+
+  margin:
+    0
+    auto
+    18px;
+
+  place-items: center;
+
+  background:
+    conic-gradient(
+      var(--result-color)
+      0
+      var(--angle),
+
+      var(--surface-muted)
+      var(--angle)
+      360deg
+    );
+
+  border-radius: 50%;
+
+  transform: rotate(8deg);
+}
+
+
+.score-ring::before {
+  position: absolute;
+
+  width: 101px;
+  height: 101px;
+
+  content: "";
+
+  background: var(--background);
+
+  border-radius: 50%;
+}
+
+
+.score-content {
+  position: relative;
+
+  z-index: 1;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  transform: rotate(-8deg);
+
+  text-align: center;
+}
+
+
+.score-content strong {
+  color: var(--text);
+
+  font-family:
+    "Roboto Mono",
+    Consolas,
+    monospace;
+
+  font-size: 32px;
+
+  font-weight: 700;
+
+  line-height: 1;
+}
+
+
+.score-content span {
+  margin-top: 4px;
+
+  color: var(--muted);
+
+  font-size: 9px;
+
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   VEREDITO
+   ========================================================= */
+
+.verdict {
+  display: flex;
+
+  width: 84%;
+
+  min-height: 39px;
+
+  margin-bottom: 16px;
+
+  padding:
+    7px
+    14px;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  color: var(--result-color);
+
+  background:
+    color-mix(
+      in srgb,
+      var(--result-color) 13%,
+      transparent
+    );
+
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--result-color) 52%,
+      transparent
+    );
+
+  border-radius: 999px;
+
+  text-align: center;
+
+  font-size: 15px;
+
+  font-weight: 700;
+}
+
+
+.verdict img {
+  display: block;
+
+  width: 16px;
+  height: 16px;
+
+  object-fit: contain;
+}
+
+
+/* =========================================================
+   CARDS DO RESULTADO
+   ========================================================= */
+
+.result-card {
+  width: 100%;
+
+  margin-bottom: 10px;
+
+  padding:
+    13px
+    14px;
+
+  background: var(--surface-strong);
+
+  border:
+    1px solid
+    var(--border);
+
+  border-radius: 6px;
+}
+
+
+/* =========================================================
+   TÍTULO DO CARD
+   ========================================================= */
+
+.result-card h2 {
+  display: flex;
+
+  margin:
+    0
+    0
+    7px;
+
+  align-items: center;
+
+  gap: 7px;
+
+  color: var(--text);
+
+  font-size: 13px;
+
+  font-weight: 700;
+}
+
+
+.result-card h2 img {
+  display: block;
+
+  width: 15px;
+  height: 15px;
+
+  object-fit: contain;
+}
+
+
+/* =========================================================
+   TEXTO DOS CARDS
+   ========================================================= */
+
+.result-card p,
+.result-card li {
+  color: var(--muted);
+
+  font-size: 11.5px;
+
+  line-height: 1.45;
+}
+
+
+.result-card p {
+  margin: 0;
+}
+
+
+/* =========================================================
+   LISTA DOS FATORES
+   ========================================================= */
+
+.result-card ul {
+  display: grid;
+
+  gap: 7px;
+
+  margin: 0;
+  padding: 0;
+
+  list-style: none;
+}
+
+
+.result-card li {
+  position: relative;
+
+  padding-left: 14px;
+}
+
+
+.result-card li::before {
+  position: absolute;
+
+  top: 6px;
+  left: 0;
+
+  width: 7px;
+  height: 7px;
+
+  content: "";
+
+  background: var(--result-color);
+
+  border-radius: 50%;
+}
+
+
+/* =========================================================
+   NOVA ANÁLISE
+   ========================================================= */
+
+.new-analysis-button {
+  min-height: 42px;
+
+  margin-top: auto;
+
+  color: #ffffff;
+
+  background: var(--button-muted);
+
+  border: 0;
+
+  font-size: 14px;
+}
+
+
+.new-analysis-button img {
+  display: block;
+
+  width: 17px;
+  height: 17px;
+
+  object-fit: contain;
+}
+
+
+/* =========================================================
+   REDUÇÃO DE ANIMAÇÕES
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+
+    animation-duration: 0.01ms !important;
+
+    animation-iteration-count: 1 !important;
+
+    transition-duration: 0.01ms !important;
+  }
+}
