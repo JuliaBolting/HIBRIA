@@ -157,3 +157,5 @@ desktop.ini
 *.temp
 *.bak
 *.old
+ai-engine/data/vector_store/index.faiss
+ai-engine/data/vector_store/metadata.json
