@@ -1,4 +1,4 @@
-﻿{
+{
   "manifest_version": 3,
   "name": "HÍBRIA",
   "description": "Análise inteligente de confiabilidade de conteúdo.",
@@ -13,7 +13,6 @@
     "storage"
   ],
   "host_permissions": [
-    "http://127.0.0.1:8000/*",
-    "http://localhost:8000/*"
+    "https://hibria-tcc.duckdns.org/*"
   ]
 }
