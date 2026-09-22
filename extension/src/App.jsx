@@ -478,32 +478,43 @@ function formatScore(score) {
    VEREDITO
    ========================================================= */
 
+function getResultLabel(result) {
+  const rawLabel =
+    result?.analysis?.label ??
+    result?.label ??
+    result?.label_final;
+
+  return String(rawLabel || "")
+    .trim()
+    .toLowerCase();
+}
+
 function getVerdict(result) {
+  const label = getResultLabel(result);
+
+  if (label) {
+    return formatStatus(label);
+  }
+
   const score = getScore(result);
 
-  if (score >= 70) {
-    return "Confiável";
-  }
-
-  if (score >= 40) {
-    return "Parcialmente confiável";
-  }
-
-  return "Não Confiável";
+  if (score >= 70) return "Confiável";
+  if (score >= 40) return "Parcialmente confiável";
+  return "Não confiável";
 }
 
 function getVerdictIcon(result) {
-  const score = getScore(result);
+  const label = getResultLabel(result);
 
-  if (score >= 70) {
+  if (label === "confiável") {
     return "/circle-check-big.png";
   }
 
-  if (score >= 40) {
-    return "/triangle-alert.png";
+  if (label === "não confiável") {
+    return "/circle-x.png";
   }
 
-  return "/circle-x.png";
+  return "/triangle-alert.png";
 }
 
 /* =========================================================
@@ -511,17 +522,17 @@ function getVerdictIcon(result) {
    ========================================================= */
 
 function getResultColor(result) {
-  const score = getScore(result);
+  const label = getResultLabel(result);
 
-  if (score >= 70) {
+  if (label === "confiável") {
     return "#16c784";
   }
 
-  if (score >= 40) {
-    return "#f5a300";
+  if (label === "não confiável") {
+    return "#ef4444";
   }
 
-  return "#ef4444";
+  return "#f5a300";
 }
 
 /* =========================================================
@@ -529,31 +540,31 @@ function getResultColor(result) {
    ========================================================= */
 
 function getEvidenceIcon(result) {
-  const score = getScore(result);
+  const label = getResultLabel(result);
 
-  if (score >= 70) {
+  if (label === "confiável") {
     return "/clipboard-list-green.png";
   }
 
-  if (score >= 40) {
-    return "/clipboard-list-ambar.png";
+  if (label === "não confiável") {
+    return "/clipboard-list-red.png";
   }
 
-  return "/clipboard-list-red.png";
+  return "/clipboard-list-ambar.png";
 }
 
 function getDetailsIcon(result) {
-  const score = getScore(result);
+  const label = getResultLabel(result);
 
-  if (score >= 70) {
+  if (label === "confiável") {
     return "/list-checks-green.png";
   }
 
-  if (score >= 40) {
-    return "/list-checks-ambar.png";
+  if (label === "não confiável") {
+    return "/list-checks-red.png";
   }
 
-  return "/list-checks-red.png";
+  return "/list-checks-ambar.png";
 }
 
 /* =========================================================
@@ -584,9 +595,11 @@ function getExplanation(result) {
 
 function getFactors(result) {
   const factors =
+    result?.details ??
     result?.factors ??
     result?.main_factors ??
     result?.key_factors ??
+    result?.analysis?.details ??
     result?.analysis?.factors;
 
   if (

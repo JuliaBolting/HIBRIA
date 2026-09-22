@@ -24,7 +24,7 @@ def analyze(request: AnalyzeRequest):
 
         return AnalyzeResponse(
             success=True,
-            data=result.to_dict(),
+            data=result.response or result.to_dict(),
             error=None,
         )
 

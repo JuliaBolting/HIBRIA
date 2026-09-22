@@ -163,6 +163,7 @@ class PipelineResult:
     # ── explanation_generator ────────────────────────────────────────────────
 
     explanation: str | None = None
+    details: list[str] = field(default_factory=list)
 
     # ── response_formatter ───────────────────────────────────────────────────
 
@@ -376,6 +377,7 @@ class PipelineResult:
 
             # saída
             "explanation": self.explanation,
+            "details": self.details,
             "response": self.response,
             "auto_indexing": self.auto_indexing,
 
@@ -1038,17 +1040,18 @@ class HibriaPipeline:
 
         from pipeline.output.explanation_generator import ExplanationGenerator
 
-        explanation = ExplanationGenerator.generate(result)
+        report = ExplanationGenerator.generate(result)
 
-        if explanation:
-            result.explanation = explanation
+        if report:
+            result.explanation = report.get("explanation")
+            result.details = list(report.get("details") or [])[:4]
             logger.info(
-                "[explanation_generator] explicação gerada com sucesso"
+                "[explanation_generator] explicação e detalhes gerados com sucesso"
             )
         else:
             result.warnings.append(
-                "[explanation_generator] LLM indisponível — "
-                "análise continua sem explicação gerada por IA"
+                "[explanation_generator] Qwen local indisponível — "
+                "análise continua sem explicação gerada por LLM"
             )
 
         return result

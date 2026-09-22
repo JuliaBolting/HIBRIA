@@ -40,12 +40,15 @@ class ResponseFormatter:
             },
 
             "explanation": result.explanation,
+            "details": result.details,
 
             "source": {
                 "reputation": result.reputation,
             },
 
             "evidence": {
+                "score": (result.score_breakdown or {}).get("evidence_score"),
+                "coverage": (result.score_breakdown or {}).get("coverage_score"),
                 "claim_count": result.claim_count,
                 "evidence_count": result.evidence_count,
                 "claims": [],

@@ -1,19 +1,21 @@
 # =============================================================================
 # HÍBRIA — Explanation Generator
 #
-# Responsável por gerar a explicação textual do resultado da análise.
+# Responsável por gerar a explicação curta exibida ao usuário e os tópicos de
+# detalhes do resultado da análise.
 #
 # IMPORTANTE:
 # - Não calcula o score.
 # - Não altera o label.
 # - Não refaz a análise.
-# - Não substitui o aggregator.py.
-# - Usa a mesma API REST do Gemini utilizada pelo retriever.
-# - Se o Gemini falhar, o pipeline continua normalmente.
+# - Não pesquisa na web.
+# - Usa Qwen localmente por meio da API HTTP do Ollama.
+# - Se o Qwen/Ollama falhar, o pipeline continua normalmente.
 # =============================================================================
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any
@@ -27,151 +29,159 @@ load_dotenv()
 
 
 class ExplanationGenerator:
+    """Gera o texto final de transparência usando somente dados do pipeline."""
 
-    # -------------------------------------------------------------------------
-    # Configurações
-    # -------------------------------------------------------------------------
+    DEFAULT_API_URL = "http://127.0.0.1:11434/api/chat"
+    DEFAULT_MODEL = "qwen3:0.6b"
+    DEFAULT_TIMEOUT = 120
+    MAX_INPUT_CHARS = 4000
 
-    API_URL_TEMPLATE = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "{model}:generateContent"
-    )
-
-    DEFAULT_MODEL = "gemini-2.5-flash"
-
-    # Timeout da requisição em segundos.
-    # 120 segundos conforme definido para esta etapa.
-    TIMEOUT = 120
-
-    # Limite de saída.
-    # A explicação da extensão deve ser curta.
-    MAX_OUTPUT_TOKENS = 250
-
-    # Limite aproximado do prompt enviado ao Gemini.
-    MAX_INPUT_CHARS = 6000
+    OUTPUT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "explanation": {
+                "type": "string",
+                "maxLength": 300,
+                "description": (
+                    "Explicação curta do resultado em português do Brasil, "
+                    "com no máximo duas frases."
+                ),
+            },
+            "details": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "maxLength": 160,
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": (
+                    "Exatamente três tópicos curtos que explicam os principais "
+                    "fatores do resultado."
+                ),
+            },
+        },
+        "required": ["explanation", "details"],
+        "additionalProperties": False,
+    }
 
     @classmethod
-    def generate(cls, result: Any) -> str | None:
+    def generate(cls, result: Any) -> dict[str, Any] | None:
         """
-        Gera uma explicação curta para o resultado da análise.
-
         Retorna:
-            str  -> explicação gerada
-            None -> Gemini indisponível ou erro
+            {
+                "explanation": str,
+                "details": list[str],
+            }
 
-        A falha desta etapa NÃO interrompe o pipeline.
+        Retorna None quando o serviço local estiver indisponível ou quando a
+        resposta não puder ser validada. A falha não interrompe o pipeline.
         """
 
-        api_key = os.getenv("GEMINI_API_KEY", "").strip()
-
-        if not api_key:
-            logger.warning(
-                "[explanation_generator] GEMINI_API_KEY não configurada"
-            )
-            return None
+        api_url = os.getenv(
+            "HIBRIA_QWEN_API_URL",
+            cls.DEFAULT_API_URL,
+        ).strip() or cls.DEFAULT_API_URL
 
         model = os.getenv(
-            "HIBRIA_AI_FALLBACK_MODEL",
+            "HIBRIA_QWEN_MODEL",
             cls.DEFAULT_MODEL,
-        ).strip()
+        ).strip() or cls.DEFAULT_MODEL
 
-        if not model:
-            model = cls.DEFAULT_MODEL
+        timeout = cls._env_int(
+            "HIBRIA_QWEN_TIMEOUT_SECONDS",
+            cls.DEFAULT_TIMEOUT,
+        )
 
         try:
             prompt = cls._build_prompt(result)
 
-            url = cls.API_URL_TEMPLATE.format(model=model)
-
             payload = {
-                "contents": [
+                "model": model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": cls._system_prompt(),
+                    },
                     {
                         "role": "user",
-                        "parts": [
-                            {
-                                "text": prompt,
-                            }
-                        ],
-                    }
+                        "content": prompt,
+                    },
                 ],
-                "generationConfig": {
-                    "temperature": 0.2,
-                    "maxOutputTokens": cls.MAX_OUTPUT_TOKENS,
+                "stream": False,
+                "think": False,
+                "format": cls.OUTPUT_SCHEMA,
+                "options": {
+                    "temperature": 0.1,
+                    "top_p": 0.8,
+                    "top_k": 20,
+                    "num_ctx": 4096,
+                    "num_predict": 220,
                 },
+                "keep_alive": "10m",
             }
 
             logger.info(
-                "[explanation_generator] enviando solicitação ao Gemini "
-                f"(model={model}, timeout={cls.TIMEOUT}s)"
+                "[explanation_generator] enviando solicitação ao Qwen local "
+                f"(model={model}, timeout={timeout}s, prompt={len(prompt)} chars)"
             )
 
             response = requests.post(
-                url,
-                params={"key": api_key},
-                headers={
-                    "Content-Type": "application/json",
-                },
+                api_url,
+                headers={"Content-Type": "application/json"},
                 json=payload,
-                timeout=cls.TIMEOUT,
+                timeout=timeout,
             )
-
-            # -----------------------------------------------------------------
-            # Erros HTTP
-            # -----------------------------------------------------------------
 
             if response.status_code >= 400:
                 logger.warning(
-                    "[explanation_generator] erro HTTP da API Gemini "
+                    "[explanation_generator] erro HTTP do Ollama/Qwen "
                     f"({response.status_code}): {response.text[:1000]}"
                 )
-
                 return None
-
-            # -----------------------------------------------------------------
-            # JSON
-            # -----------------------------------------------------------------
 
             try:
                 data = response.json()
             except ValueError:
                 logger.warning(
-                    "[explanation_generator] Gemini retornou resposta "
+                    "[explanation_generator] Ollama retornou resposta "
                     "que não é JSON válido"
                 )
                 return None
 
-            # -----------------------------------------------------------------
-            # Extrai texto
-            # -----------------------------------------------------------------
+            raw_content = (
+                (data.get("message") or {}).get("content")
+                if isinstance(data, dict)
+                else None
+            )
 
-            explanation = cls._extract_text(data)
+            report = cls._parse_report(raw_content)
 
-            if not explanation:
+            if report is None:
                 logger.warning(
-                    "[explanation_generator] Gemini retornou "
-                    "resposta sem texto"
+                    "[explanation_generator] Qwen retornou saída inválida. "
+                    f"Conteúdo recebido: {str(raw_content)[:1500]}"
                 )
                 return None
 
-            explanation = explanation.strip()
-
             logger.info(
-                "[explanation_generator] explicação gerada com sucesso "
-                f"({len(explanation)} caracteres)"
+                "[explanation_generator] relatório gerado com sucesso "
+                f"({len(report['explanation'])} caracteres, "
+                f"{len(report['details'])} detalhes)"
             )
 
-            return explanation
+            return report
 
         except requests.Timeout:
             logger.warning(
-                "[explanation_generator] timeout ao consultar Gemini "
-                f"(>{cls.TIMEOUT}s)"
+                "[explanation_generator] timeout ao consultar Qwen local "
+                f"(>{timeout}s)"
             )
             return None
 
         except requests.RequestException as exc:
             logger.warning(
-                "[explanation_generator] erro de comunicação com Gemini: "
+                "[explanation_generator] erro de comunicação com Ollama/Qwen: "
                 f"{exc}"
             )
             return None
@@ -184,315 +194,378 @@ class ExplanationGenerator:
             return None
 
     # =========================================================================
-    # Construção do prompt
+    # Prompt
     # =========================================================================
+
+    @staticmethod
+    def _system_prompt() -> str:
+        return """
+/no_think
+
+Você é o módulo de redação final da HÍBRIA.
+
+O resultado da análise já foi calculado pelo sistema.
+Sua única função é explicar esse resultado de maneira simples e curta.
+
+REGRAS OBRIGATÓRIAS:
+- Não altere a classificação final.
+- Não recalcule o resultado.
+- Não pesquise e não utilize conhecimento externo.
+- Use somente os dados fornecidos.
+- Não invente fatos, fontes ou evidências.
+- Não apresente scores, pesos, percentuais ou valores internos.
+- Não mencione Qwen, BERTimbau, modelos, classificadores, pipeline, aggregator,
+  stance ou nomes de componentes internos.
+- Não mencione divergências entre classificadores internos.
+- Considere somente a classificação final como o resultado oficial.
+- A reputação da fonte é apenas um fator complementar.
+- Ausência de evidência não significa falsidade.
+- Só diga que há contradição quando as evidências fornecidas realmente
+  indicarem contradição.
+- Escreva para uma pessoa comum, sem linguagem técnica.
+- Não use Markdown.
+- Não explique seu raciocínio.
+- Responda em português do Brasil.
+
+A saída deve conter:
+- "explanation": uma ou duas frases curtas, com no máximo 300 caracteres.
+- "details": exatamente três frases curtas, cada uma com no máximo 160 caracteres.
+
+Não repita nos detalhes exatamente a mesma informação da explicação.
+""".strip()
 
     @classmethod
     def _build_prompt(cls, result: Any) -> str:
-        """
-        Constrói um prompt pequeno usando somente informações já calculadas
-        pelo pipeline.
-
-        Não envia o PipelineResult inteiro para o Gemini.
-        """
-
-        score = getattr(result, "score_final", None)
         label = getattr(result, "label_final", None)
-
-        breakdown = getattr(
-            result,
-            "score_breakdown",
-            None,
-        )
-
-        reputation = getattr(
-            result,
-            "reputation",
-            None,
-        )
-
-        claims = getattr(
-            result,
-            "claims",
-            None,
-        )
-
-        stance_results = getattr(
-            result,
-            "stance_results",
-            None,
-        )
-
-        title = getattr(
-            result,
-            "title",
-            "",
-        ) or ""
-
-        # ---------------------------------------------------------------------
-        # Claims principais
-        # ---------------------------------------------------------------------
+        breakdown = getattr(result, "score_breakdown", None)
+        reputation = getattr(result, "reputation", None)
+        claims = getattr(result, "claims", None)
+        stance_results = getattr(result, "stance_results", None)
+        retrieval_results = getattr(result, "retrieval_results", None)
+        title = getattr(result, "title", "") or ""
 
         claim_texts: list[str] = []
-
-        for claim in (claims or [])[:5]:
-
-            text = getattr(
-                claim,
-                "text",
-                None,
-            )
-
+        for claim in (claims or [])[:3]:
+            text = getattr(claim, "text", None)
             if text:
-                claim_texts.append(
-                    str(text)[:400]
-                )
+                claim_texts.append(str(text)[:220])
 
-        # ---------------------------------------------------------------------
-        # Relações de evidência / stance
-        # ---------------------------------------------------------------------
-
-        stance_summary: list[str] = []
-
+        stance_summary: list[dict[str, Any]] = []
         for item in (stance_results or [])[:5]:
-
             try:
-
                 if hasattr(item, "to_dict"):
                     item = item.to_dict()
 
-                if isinstance(item, dict):
+                if not isinstance(item, dict):
+                    continue
 
-                    stance = (
-                        item.get("stance")
-                        or item.get("label")
-                        or item.get("relation")
-                    )
-
-                    if stance:
-                        stance_summary.append(
-                            str(stance)
-                        )
+                stance_summary.append(
+                    {
+                        "stance": item.get("stance"),
+                        "confidence": item.get("confidence"),
+                        "reason": str(item.get("reason") or "")[:160],
+                        "source": str(item.get("source") or "")[:100],
+                    }
+                )
 
             except Exception:
                 continue
 
-        # ---------------------------------------------------------------------
-        # Score breakdown
-        # ---------------------------------------------------------------------
+        evidence_summary: list[dict[str, Any]] = []
 
+        for retrieval in (retrieval_results or [])[:3]:
+            claim = getattr(retrieval, "claim", None)
+            claim_text = str(
+                getattr(claim, "text", "") or ""
+            )[:220]
+
+            for evidence in list(
+                getattr(retrieval, "evidences", []) or []
+            )[:1]:
+
+                evidence_summary.append(
+                    {
+                        "claim": claim_text,
+                        "source": str(
+                            getattr(evidence, "source", "") or ""
+                        )[:100],
+                        "title": str(
+                            getattr(evidence, "title", "") or ""
+                        )[:140],
+                        "stance": getattr(
+                            evidence,
+                            "stance",
+                            None,
+                        ),
+                        "trusted_source": getattr(
+                            evidence,
+                            "trusted_source",
+                            None,
+                        ),
+                        "excerpt": str(
+                            getattr(evidence, "text", "") or ""
+                        )[:200],
+                    }
+                )
+
+        # Mantemos apenas os dados necessários para explicar
+        # cobertura e relação entre afirmações e evidências.
         safe_breakdown: dict[str, Any] = {}
 
         if isinstance(breakdown, dict):
-
-            for key, value in list(
-                breakdown.items()
-            )[:10]:
-
-                if isinstance(
-                    value,
-                    (str, int, float, bool),
-                ):
-                    safe_breakdown[key] = value
-
-        # ---------------------------------------------------------------------
-        # Reputação
-        # ---------------------------------------------------------------------
+            for key in (
+                "evidence_score",
+                "coverage_score",
+                "reputation_status",
+                "stance_stats",
+            ):
+                if key in breakdown:
+                    safe_breakdown[key] = breakdown.get(key)
 
         reputation_summary: dict[str, Any] = {}
 
         if isinstance(reputation, dict):
-
             for key in (
                 "status",
-                "domain",
-                "canonical_domain",
                 "source_name",
                 "note",
-                "score",
+                "classification",
             ):
-
                 value = reputation.get(key)
 
                 if value is not None:
                     reputation_summary[key] = value
 
-        # ---------------------------------------------------------------------
-        # Contexto reduzido
-        # ---------------------------------------------------------------------
-
         context = {
-            "titulo": title[:500],
-            "score_final": score,
-            "rotulo_final": label,
+            "titulo": title[:300],
+            "resultado_calculado": {
+                "label": label,
+            },
             "componentes": safe_breakdown,
             "reputacao_fonte": reputation_summary,
             "claims_principais": claim_texts,
-            "relacoes_evidencias": stance_summary,
+            "relacoes_claim_evidencia": stance_summary,
+            "amostra_evidencias_recuperadas": evidence_summary,
         }
 
-        # ---------------------------------------------------------------------
-        # Prompt
-        # ---------------------------------------------------------------------
+        prompt = cls._render_prompt(context)
 
-        prompt = f"""
-Você é responsável pela explicação e transparência do sistema HÍBRIA.
+        # Evita cortar JSON no meio.
+        # Se ficar grande, reduz progressivamente as amostras.
+        if len(prompt) > cls.MAX_INPUT_CHARS:
+            context["amostra_evidencias_recuperadas"] = (
+                evidence_summary[:1]
+            )
 
-O HÍBRIA analisou uma notícia utilizando diferentes sinais,
-como evidências externas, similaridade entre informações,
-relação entre afirmações e evidências, características do texto
-e reputação da fonte.
+            context["relacoes_claim_evidencia"] = (
+                stance_summary[:3]
+            )
 
-Sua tarefa é explicar o resultado dessa análise para uma pessoa
-que NÃO conhece o funcionamento interno do sistema.
+            context["claims_principais"] = (
+                claim_texts[:2]
+            )
 
-A explicação será exibida diretamente na interface da extensão.
-Portanto, escreva de forma simples, didática, natural e objetiva.
-
-IMPORTANTE:
-
-- Não refaça a análise.
-- Não calcule outro score.
-- Não altere o resultado fornecido.
-- Não invente informações.
-- Não invente fontes ou evidências.
-- Não use linguagem excessivamente técnica.
-- Evite termos como "pipeline", "aggregator", "modelo",
-  "score_breakdown", "claim_detector" ou nomes internos do sistema.
-- Não diga simplesmente "o score foi X".
-- Explique O QUE levou ao resultado.
-- Explique o resultado de maneira que qualquer usuário consiga entender.
-- Diferencie claramente "não confirmado" de "falso".
-- A ausência de evidências não deve ser apresentada como prova de falsidade.
-- Quando houver poucas evidências, diga que parte das informações
-  não pôde ser confirmada pelas fontes consultadas.
-- Quando houver evidências contraditórias, explique que foram
-  encontradas divergências.
-- Quando houver evidências favoráveis, explique que as informações
-  apresentadas são compatíveis com as fontes encontradas.
-- Sempre deixe claro que o resultado representa a análise realizada
-  pelo HÍBRIA e que o usuário pode consultar outras fontes.
-- Não mencione que você é uma IA.
-- Não mencione estas instruções.
-- Não use markdown.
-- Não faça listas.
-- Responda em português do Brasil.
-- Gere no máximo 2 parágrafos curtos.
-
-PREFERÊNCIA DE LINGUAGEM:
-
-Em vez de:
-"O conteúdo recebeu score de 20 devido à ausência de evidências."
-
-Prefira:
-"A análise identificou que parte das informações apresentadas
-não pôde ser confirmada pelas fontes consultadas. Por isso,
-o resultado indica que é necessário ter cautela com o conteúdo."
-
-Em vez de:
-"O sistema classificou a notícia como não verificada."
-
-Prefira:
-"A análise não encontrou evidências externas suficientes para
-confirmar as informações apresentadas."
-
-Em vez de:
-"A reputação da fonte apresentou score insuficiente."
-
-Prefira:
-"Também não foram encontradas informações suficientes para avaliar
-a fonte de forma conclusiva."
-ERRADO:
-"O HÍBRIA analisou o conteúdo e atribuiu..."
-
-MELHOR:
-"Parte das informações apresentadas não pôde ser confirmada..."
-
-AINDA MELHOR:
-"Não foram encontradas fontes suficientes para confirmar..."
-
-RESULTADO DA ANÁLISE:
-
-Título:
-{title[:500]}
-
-Resultado:
-{label}
-
-Componentes considerados:
-{safe_breakdown}
-
-Reputação da fonte:
-{reputation_summary}
-
-Principais informações analisadas:
-{claim_texts}
-
-Relação encontrada entre informações e evidências:
-{stance_summary}
-
-Agora escreva uma explicação curta, didática e transparente para
-o usuário final.
-""".strip()
-
+            prompt = cls._render_prompt(context)
 
         if len(prompt) > cls.MAX_INPUT_CHARS:
+            context["amostra_evidencias_recuperadas"] = []
 
-            prompt = prompt[:cls.MAX_INPUT_CHARS]
+            context["relacoes_claim_evidencia"] = (
+                stance_summary[:2]
+            )
 
-            prompt += """
+            context["titulo"] = str(
+                context.get("titulo") or ""
+            )[:180]
 
-Continue utilizando somente as informações presentes acima.
-Responda em 1 ou 2 parágrafos curtos.
-""".strip()
+            prompt = cls._render_prompt(context)
+
+        if len(prompt) > cls.MAX_INPUT_CHARS:
+            context["relacoes_claim_evidencia"] = []
+
+            context["claims_principais"] = (
+                claim_texts[:1]
+            )
+
+            context["reputacao_fonte"] = {
+                key: value
+                for key, value in reputation_summary.items()
+                if key in {"status", "classification"}
+            }
+
+            prompt = cls._render_prompt(context)
+
+        logger.debug(
+            "[explanation_generator] prompt final com %s caracteres",
+            len(prompt),
+        )
 
         return prompt
 
-    # =========================================================================
-    # Extração da resposta Gemini
-    # =========================================================================
-
     @staticmethod
-    def _extract_text(data: dict) -> str:
-        """
-        Extrai o texto da estrutura retornada pela API REST do Gemini.
-        """
+    def _render_prompt(
+        context: dict[str, Any],
+    ) -> str:
 
-        candidates = data.get(
-            "candidates",
-            [],
-        ) or []
+        context_json = json.dumps(
+            context,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
 
-        if not candidates:
-            return ""
+        return f"""
+/no_think
 
-        first_candidate = candidates[0]
+Escreva a explicação final da análise usando exclusivamente o contexto abaixo.
 
-        content = first_candidate.get(
-            "content",
-            {},
-        ) or {}
+Retorne somente o objeto JSON solicitado pelo schema.
 
-        parts = content.get(
-            "parts",
-            [],
-        ) or []
+A "explanation" deve explicar de forma simples o principal motivo da
+classificação final.
 
-        texts: list[str] = []
+Os três itens de "details" devem destacar fatores concretos encontrados nas
+evidências, sem repetir a explanation.
 
-        for part in parts:
+CONTEXTO:
+{context_json}
+""".strip()
 
-            if not isinstance(part, dict):
+    # =========================================================================
+    # Validação da resposta
+    # =========================================================================
+
+    @classmethod
+    def _parse_report(
+        cls,
+        raw_content: Any,
+    ) -> dict[str, Any] | None:
+
+        if not isinstance(
+            raw_content,
+            str,
+        ) or not raw_content.strip():
+
+            return None
+
+        content = raw_content.strip()
+
+        # Remove bloco Markdown se o modelo insistir.
+        if content.startswith("```"):
+            lines = content.splitlines()
+
+            if lines:
+                lines = lines[1:]
+
+            if (
+                lines
+                and lines[-1].strip() == "```"
+            ):
+                lines = lines[:-1]
+
+            content = "\n".join(
+                lines
+            ).strip()
+
+        # Caso exista algum texto antes ou depois,
+        # aproveita somente o objeto JSON.
+        start = content.find("{")
+        end = content.rfind("}")
+
+        if (
+            start >= 0
+            and end > start
+        ):
+            content = content[
+                start : end + 1
+            ]
+
+        try:
+            parsed = json.loads(content)
+
+        except json.JSONDecodeError:
+            return None
+
+        if not isinstance(
+            parsed,
+            dict,
+        ):
+            return None
+
+        explanation = str(
+            parsed.get("explanation")
+            or parsed.get("evidence")
+            or parsed.get("evidencia")
+            or ""
+        ).strip()
+
+        raw_details = (
+            parsed.get("details")
+            or parsed.get("detalhes")
+            or []
+        )
+
+        if isinstance(
+            raw_details,
+            str,
+        ):
+            raw_details = [
+                raw_details
+            ]
+
+        if (
+            not explanation
+            or not isinstance(
+                raw_details,
+                list,
+            )
+        ):
+            return None
+
+        details: list[str] = []
+
+        for item in raw_details:
+            text = str(
+                item or ""
+            ).strip()
+
+            if not text:
                 continue
 
-            text = part.get(
-                "text",
-                "",
-            )
-
-            if text:
-                texts.append(
-                    str(text)
+            if text not in details:
+                details.append(
+                    text[:160]
                 )
 
-        return "\n".join(texts).strip()
+            if len(details) >= 3:
+                break
+
+        if not details:
+            return None
+
+        return {
+            "explanation": explanation[:300],
+            "details": details,
+        }
+
+    @staticmethod
+    def _env_int(
+        name: str,
+        default: int,
+    ) -> int:
+
+        value = os.getenv(name)
+
+        if (
+            value is None
+            or not value.strip()
+        ):
+            return default
+
+        try:
+            return max(
+                1,
+                int(value),
+            )
+
+        except ValueError:
+            return default
