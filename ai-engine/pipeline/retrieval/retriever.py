@@ -43,6 +43,8 @@ from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 
 import requests
 
+from .search_providers.quota import ProviderQuota
+
 logger = logging.getLogger(__name__)
 
 
@@ -1429,81 +1431,46 @@ class SerpSearchSource(EvidenceSource):
         self._searchapi_key = os.getenv("SEARCHAPI_API_KEY", "").strip()
 
         self._trusted_domains = split_env_list("HIBRIA_TRUSTED_DOMAINS")
-        self._daily_limit = env_int("HIBRIA_SERP_SEARCH_DAILY_LIMIT", 80)
         self._sleep_seconds = env_float("HIBRIA_SERP_SEARCH_SLEEP_SECONDS", 0.8)
         self._current_url = current_url
         self._document_context = normalize_space(document_context)
-        self._rate_limited_until = 0.0
+        self._rate_limited_until: dict[str, float] = {}
 
-    def is_available(self) -> bool:
-        serper_available = bool(
+    def _provider_candidates(self) -> list[str]:
+        candidates: list[str] = []
+
+        if (
             self._serper_enabled
             and self._serper_key
             and self._serper_key.lower()
             not in {"", "sua_chave_aqui", "your_key_here", "sua_chave_serper_aqui"}
-        )
+        ):
+            candidates.append("serper")
 
-        serpapi_available = bool(
+        if (
             self._serpapi_enabled
             and self._serpapi_key
             and self._serpapi_key.lower() not in {"sua_chave_aqui", "your_key_here"}
-        )
+        ):
+            candidates.append("serpapi")
 
-        searchapi_available = bool(
+        if (
             self._searchapi_enabled
             and self._searchapi_key
             and self._searchapi_key.lower() not in {"sua_chave_aqui", "your_key_here"}
-        )
+        ):
+            candidates.append("searchapi")
 
-        return (
-            serper_available or serpapi_available or searchapi_available
-        ) and time.time() >= self._rate_limited_until
+        now = time.time()
+        return [
+            provider
+            for provider in candidates
+            if now >= self._rate_limited_until.get(provider, 0.0)
+            and ProviderQuota.can_use(provider)
+        ]
 
-    def _provider(self) -> str:
-        if self._serper_enabled and self._serper_key:
-            return "serper"
-
-        if self._serpapi_enabled and self._serpapi_key:
-            return "serpapi"
-
-        return "searchapi"
-
-    def _quota_file(self) -> Path:
-        return Path("data/runtime/serp_search_quota.json")
-
-    def _read_quota(self) -> dict:
-        today = datetime.now().strftime("%Y-%m-%d")
-        quota_file = self._quota_file()
-
-        if not quota_file.exists():
-            return {"date": today, "count": 0}
-
-        try:
-            with open(quota_file, "r", encoding="utf-8") as file:
-                data = json.load(file)
-        except Exception:
-            return {"date": today, "count": 0}
-
-        if data.get("date") != today:
-            return {"date": today, "count": 0}
-
-        return {"date": today, "count": int(data.get("count", 0))}
-
-    def _write_quota(self, data: dict) -> None:
-        quota_file = self._quota_file()
-        quota_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(quota_file, "w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
-
-    def _can_search(self) -> bool:
-        quota = self._read_quota()
-        return quota["count"] < self._daily_limit
-
-    def _register_search(self) -> None:
-        quota = self._read_quota()
-        quota["count"] += 1
-        self._write_quota(quota)
+    def is_available(self) -> bool:
+        return bool(self._provider_candidates())
 
     def _is_same_url(self, url: str) -> bool:
         if env_flag("HIBRIA_ALLOW_SELF_EVIDENCE", default=False):
@@ -1527,9 +1494,7 @@ class SerpSearchSource(EvidenceSource):
             max_chars=220,
         )
 
-    def _request(self, query: str, top_k: int):
-        provider = self._provider()
-
+    def _request(self, provider: str, query: str, top_k: int):
         if provider == "serper":
             payload = {
                 "q": query,
@@ -1550,7 +1515,7 @@ class SerpSearchSource(EvidenceSource):
                     timeout=15,
                 )
             except requests.RequestException as exc:
-                self._rate_limited_until = time.time() + 5 * 60
+                self._rate_limited_until[provider] = time.time() + 5 * 60
                 logger.warning(
                     f"[{source_name}] falha de conexão/timeout; camada pausada: {exc}"
                 )
@@ -1584,7 +1549,7 @@ class SerpSearchSource(EvidenceSource):
         try:
             response = requests.get(url, params=params, timeout=15)
         except requests.RequestException as exc:
-            self._rate_limited_until = time.time() + 5 * 60
+            self._rate_limited_until[provider] = time.time() + 5 * 60
             logger.warning(
                 f"[{source_name}] falha de conexão/timeout; camada pausada: {exc}"
             )
@@ -1600,93 +1565,87 @@ class SerpSearchSource(EvidenceSource):
         return data.get("organic_results", []) or []
 
     def search(self, claim: Claim, top_k: int = 5) -> list[Evidence]:
-        if not self._can_search():
-            self._rate_limited_until = time.time() + 10 * 60
-            logger.warning(
-                "[serp_search] limite diário local atingido; camada pausada nesta execução"
-            )
-            return []
-
         query = self._build_query(claim)
 
         if not query:
             return []
 
-        response, source_name = self._request(query, top_k=top_k)
-
-        if response is None:
-            return []
-
-        self._register_search()
-        time.sleep(self._sleep_seconds)
-
-        if response.status_code == 429:
-            self._rate_limited_until = time.time() + 10 * 60
-            logger.warning(
-                f"[{source_name}] limite/rate limit atingido; camada pausada nesta execução"
-            )
-            return []
-
-        if should_skip_http_response(response, source_name):
-            return []
-
-        data = safe_json_response(response, source_name)
-
-        if not data:
-            return []
-
-        items = self._items_from_response(data, source_name)
-        evidences: list[Evidence] = []
-        seen_urls: set[str] = set()
-
-        for item in items:
-            title = normalize_space(item.get("title", ""))
-            url = item.get("link") or item.get("url") or ""
-            snippet = normalize_space(item.get("snippet", ""))
-
-            if not url or not snippet or url in seen_urls:
+        for provider in self._provider_candidates():
+            if not ProviderQuota.try_register(provider):
                 continue
 
-            if self._is_same_url(url):
+            response, source_name = self._request(provider, query, top_k=top_k)
+            if response is None:
                 continue
 
-            seen_urls.add(url)
+            time.sleep(self._sleep_seconds)
 
-            domain = extract_domain(url)
-            trusted = self._is_trusted_domain(url)
-            evidence_text = normalize_space(f"{title}. {snippet}")
-
-            if not _is_relevant_candidate(claim, evidence_text, url):
-                continue
-
-            similarity = _candidate_similarity(claim, evidence_text)
-
-            evidences.append(
-                Evidence(
-                    text=evidence_text,
-                    source=domain or source_name,
-                    url=url,
-                    similarity=similarity,
-                    claim_id=claim.claim_id,
-                    title=title,
-                    domain=domain,
-                    retrieval_layer=self.name,
-                    source_type="web",
-                    trusted_source=trusted,
-                    metadata={
-                        "provider": source_name,
-                        "query": query,
-                        "snippet": snippet,
-                        "position": item.get("position"),
-                        "trusted_domain": trusted,
-                    },
+            if response.status_code == 429:
+                self._rate_limited_until[provider] = time.time() + 10 * 60
+                logger.warning(
+                    f"[{source_name}] limite/rate limit atingido; tentando próximo provedor"
                 )
-            )
+                continue
 
-            if len(evidences) >= top_k:
-                break
+            if should_skip_http_response(response, source_name):
+                continue
 
-        return evidences[:top_k]
+            data = safe_json_response(response, source_name)
+            if not data:
+                continue
+
+            items = self._items_from_response(data, source_name)
+            evidences: list[Evidence] = []
+            seen_urls: set[str] = set()
+
+            for item in items:
+                title = normalize_space(item.get("title", ""))
+                url = item.get("link") or item.get("url") or ""
+                snippet = normalize_space(item.get("snippet", ""))
+
+                if not url or not snippet or url in seen_urls:
+                    continue
+                if self._is_same_url(url):
+                    continue
+
+                seen_urls.add(url)
+                domain = extract_domain(url)
+                trusted = self._is_trusted_domain(url)
+                evidence_text = normalize_space(f"{title}. {snippet}")
+
+                if not _is_relevant_candidate(claim, evidence_text, url):
+                    continue
+
+                similarity = _candidate_similarity(claim, evidence_text)
+                evidences.append(
+                    Evidence(
+                        text=evidence_text,
+                        source=domain or source_name,
+                        url=url,
+                        similarity=similarity,
+                        claim_id=claim.claim_id,
+                        title=title,
+                        domain=domain,
+                        retrieval_layer=self.name,
+                        source_type="web",
+                        trusted_source=trusted,
+                        metadata={
+                            "provider": source_name,
+                            "query": query,
+                            "snippet": snippet,
+                            "position": item.get("position"),
+                            "trusted_domain": trusted,
+                        },
+                    )
+                )
+
+                if len(evidences) >= top_k:
+                    break
+
+            if evidences:
+                return evidences[:top_k]
+
+        return []
 
 
 # =============================================================================

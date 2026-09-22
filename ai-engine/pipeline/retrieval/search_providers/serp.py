@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 import requests
 
-from .config import DEFAULT_TIMEOUT, env_flag, env_int, valid_api_key
-from .quota import DailyQuota
+from .config import DEFAULT_TIMEOUT, env_flag, valid_api_key
+from .quota import ProviderQuota
 from .models import SearchHit
 
 
@@ -17,29 +17,48 @@ class SerpSearchProvider:
         self.serper_key = os.getenv("SERPER_API_KEY", "").strip()
         self.serpapi_key = os.getenv("SERPAPI_API_KEY", "").strip()
         self.searchapi_key = os.getenv("SEARCHAPI_API_KEY", "").strip()
-        self.daily_limit = env_int("HIBRIA_SERP_SEARCH_DAILY_LIMIT", 80)
 
-    def _selected_provider(self) -> str | None:
+    def _provider_candidates(self) -> list[str]:
         reputation_auto = env_flag("HIBRIA_REPUTATION_USE_CONFIGURED_PROVIDERS", True)
-        if (env_flag("HIBRIA_ENABLE_SERPER", False) or reputation_auto) and valid_api_key(self.serper_key):
-            return "serper"
-        if (env_flag("HIBRIA_ENABLE_SERPAPI", False) or reputation_auto) and valid_api_key(self.serpapi_key):
-            return "serpapi"
-        if (env_flag("HIBRIA_ENABLE_SEARCHAPI", False) or reputation_auto) and valid_api_key(self.searchapi_key):
-            return "searchapi"
-        return None
+        candidates: list[str] = []
+        if (
+            env_flag("HIBRIA_ENABLE_SERPER", False) or reputation_auto
+        ) and valid_api_key(self.serper_key):
+            candidates.append("serper")
+        if (
+            env_flag("HIBRIA_ENABLE_SERPAPI", False) or reputation_auto
+        ) and valid_api_key(self.serpapi_key):
+            candidates.append("serpapi")
+        if (
+            env_flag("HIBRIA_ENABLE_SEARCHAPI", False) or reputation_auto
+        ) and valid_api_key(self.searchapi_key):
+            candidates.append("searchapi")
+        return candidates
 
     def is_available(self) -> bool:
-        return self._selected_provider() is not None and DailyQuota.can_use("serp", self.daily_limit)
+        return any(
+            ProviderQuota.can_use(provider)
+            for provider in self._provider_candidates()
+        )
 
     def search(self, query: str, max_results: int = 5) -> list[SearchHit]:
-        provider = self._selected_provider()
-        if provider == "serper":
-            return self._search_serper(query, max_results)
-        if provider == "serpapi":
-            return self._search_serpapi(query, max_results)
-        if provider == "searchapi":
-            return self._search_searchapi(query, max_results)
+        last_error: requests.RequestException | None = None
+
+        for provider in self._provider_candidates():
+            if not ProviderQuota.try_register(provider):
+                continue
+
+            try:
+                if provider == "serper":
+                    return self._search_serper(query, max_results)
+                if provider == "serpapi":
+                    return self._search_serpapi(query, max_results)
+                return self._search_searchapi(query, max_results)
+            except requests.RequestException as exc:
+                last_error = exc
+
+        if last_error is not None:
+            raise last_error
         return []
 
     def _search_serper(self, query: str, max_results: int) -> list[SearchHit]:
@@ -50,7 +69,6 @@ class SerpSearchProvider:
             timeout=DEFAULT_TIMEOUT,
         )
         response.raise_for_status()
-        DailyQuota.register("serp")
         data = response.json()
         return [
             SearchHit(
@@ -78,7 +96,6 @@ class SerpSearchProvider:
             timeout=DEFAULT_TIMEOUT,
         )
         response.raise_for_status()
-        DailyQuota.register("serp")
         data = response.json()
         return [
             SearchHit(
@@ -106,7 +123,6 @@ class SerpSearchProvider:
             timeout=DEFAULT_TIMEOUT,
         )
         response.raise_for_status()
-        DailyQuota.register("serp")
         data = response.json()
         return [
             SearchHit(
