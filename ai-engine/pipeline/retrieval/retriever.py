@@ -3919,6 +3919,19 @@ class EvidenceRetriever:
             if evidence.retrieval_layer == "wikipedia":
                 continue
 
+            # Com early-stop ativo, uma evidência local só economiza chamadas
+            # web se tiver sido aprovada pela memória RAG ou inserida como
+            # fonte confiável. Notícias autoindexadas pelo próprio classificador
+            # ainda podem participar do reranking, mas não encerram a busca.
+            if evidence.retrieval_layer == "vector_store":
+                metadata = evidence.metadata or {}
+                locally_approved = bool(
+                    metadata.get("approved_for_rag") is True
+                    or evidence.trusted_source
+                )
+                if not locally_approved:
+                    continue
+
             if evidence.similarity >= self.SUFFICIENT_EVIDENCE_SCORE:
                 sufficient.append(evidence)
 

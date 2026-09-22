@@ -192,6 +192,13 @@ class VectorStore:
                     f"{self._index.ntotal} vetores · "
                     f"{len(self._metadata)} documentos"
                 )
+                if self._index.ntotal != len(self._metadata):
+                    logger.warning(
+                        "[vector_store] índice inconsistente: %s vetores para "
+                        "%s metadados; execute scripts/repair_faiss_index.py",
+                        self._index.ntotal,
+                        len(self._metadata),
+                    )
             except Exception as e:
                 logger.error(f"[vector_store] falha ao carregar índice: {e}")
                 self._create_index()
@@ -445,6 +452,16 @@ class VectorStore:
             if idx == -1:
                 continue
 
+            # Um índice antigo pode possuir vetores órfãos sem linha
+            # correspondente no metadata.json. Ignorar mantém a API viva até
+            # que o script de reparo reconstrua o índice.
+            if idx >= len(self._metadata):
+                logger.warning(
+                    "[vector_store] vetor FAISS órfão ignorado: posição=%s",
+                    idx,
+                )
+                continue
+
             # score do IndexFlatIP com vetores normalizados = cosine similarity
             similarity = float(score)
 
@@ -571,6 +588,13 @@ class VectorStore:
     def unique_document_count(self) -> int:
         """Número de documentos únicos (base_doc_id distintos)."""
         return len({m["base_doc_id"] for m in self._metadata})
+
+    def contains_document(self, base_doc_id: str) -> bool:
+        """Confirma se um documento base já possui chunks no índice."""
+        return any(
+            item.get("base_doc_id") == base_doc_id
+            for item in self._metadata
+        )
 
     def stats(self) -> dict:
         """Estatísticas do índice para log e monitoramento."""
