@@ -12,7 +12,7 @@
 #        ↓
 #   bertimbau_classifier → text_features → reputation
 #        ↓
-#   aggregator → auto_indexer
+#   aggregator → explanation → formatter
 #        ↓
 #   explanation_generator → response_formatter
 #
@@ -169,10 +169,6 @@ class PipelineResult:
 
     response: dict | None = None
 
-    # ── auto_indexer ──────────────────────────────────────────────────────────
-
-    auto_indexing: dict | None = None
-
     # ── métricas internas ─────────────────────────────────────────────────────
 
     _segmentation_stats: dict = field(default_factory=dict)
@@ -324,6 +320,11 @@ class PipelineResult:
                                     "is_sufficient",
                                     False,
                                 ),
+                                "metadata": getattr(
+                                    result.top_evidence,
+                                    "metadata",
+                                    {},
+                                ),
                             }
                             if result.top_evidence
                             else None
@@ -348,6 +349,7 @@ class PipelineResult:
                                     "is_sufficient",
                                     False,
                                 ),
+                                "metadata": getattr(evidence, "metadata", {}),
                             }
                             for evidence in result.evidences
                         ],
@@ -379,8 +381,6 @@ class PipelineResult:
             "explanation": self.explanation,
             "details": self.details,
             "response": self.response,
-            "auto_indexing": self.auto_indexing,
-
             # processamento
             "processing_time": self._processing_time,
         }
@@ -630,6 +630,15 @@ class HibriaPipeline:
 
         result.segments = output["segments"]
 
+        result.sentence_texts = [
+            getattr(sentence, "text", str(sentence))
+            for sentence in result.sentences
+        ]
+        result.segment_texts = [
+            getattr(segment, "text", str(segment))
+            for segment in result.segments
+        ]
+
         result._segmentation_stats = output["stats"]
 
         logger.info(
@@ -660,7 +669,8 @@ class HibriaPipeline:
             return result
 
         output = ClaimDetector.detect(
-            result.sentences
+            result.sentences,
+            max_claims=max(1, env_int("HIBRIA_MAX_CLAIMS_PER_ANALYSIS", 10)),
         )
 
         result.claims = output["claims"]
@@ -992,41 +1002,7 @@ class HibriaPipeline:
         return result
 
     # =========================================================================
-    # STEP 13 — AUTO INDEXER
-    # =========================================================================
-
-    @staticmethod
-    def _step_auto_index(
-        result: PipelineResult,
-    ) -> PipelineResult:
-
-        from pipeline.retrieval.auto_indexer import (
-            AutoIndexer,
-        )
-
-        vector_store = (
-            HibriaPipeline._get_vector_store()
-        )
-
-        result.auto_indexing = (
-            AutoIndexer.index_result(
-                result,
-                vector_store=vector_store,
-            )
-        )
-
-        logger.info(
-            f"[auto_indexer] "
-            f"indexed="
-            f"{result.auto_indexing['indexed']} · "
-            f"reason="
-            f"{result.auto_indexing['reason']}"
-        )
-
-        return result
-
-    # =========================================================================
-    # STEP 14 — EXPLANATION
+    # STEP 13 — EXPLANATION
     # =========================================================================
 
     @staticmethod
@@ -1049,9 +1025,12 @@ class HibriaPipeline:
                 "[explanation_generator] explicação e detalhes gerados com sucesso"
             )
         else:
+            fallback = ExplanationGenerator.fallback_report(result)
+            result.explanation = fallback["explanation"]
+            result.details = fallback["details"]
             result.warnings.append(
                 "[explanation_generator] Qwen local indisponível — "
-                "análise continua sem explicação gerada por LLM"
+                "usada explicação determinística de contingência"
             )
 
         return result
@@ -1204,10 +1183,6 @@ class HibriaPipeline:
                 cls._step_aggregate,
             ),
 
-            (
-                "auto_indexer",
-                cls._step_auto_index,
-            ),
         ]
 
         steps_pending = [

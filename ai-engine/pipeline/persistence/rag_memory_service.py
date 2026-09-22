@@ -28,7 +28,10 @@ class RagMemoryService:
             "reconciled_evidences": 0,
             "failed_indexing": 0,
         }
-        if not analysis_id or not self.repository.is_configured:
+        if not self.repository.is_configured:
+            return summary
+        if not analysis_id:
+            summary["error"] = "análise não persistida; memória RAG não foi atualizada"
             return summary
 
         try:
