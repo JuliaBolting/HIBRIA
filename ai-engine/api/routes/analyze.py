@@ -2,7 +2,7 @@ from copy import deepcopy
 import os
 import threading
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from api.schemas.request import AnalyzeRequest
 from api.schemas.response import AnalyzeResponse
@@ -36,6 +36,7 @@ def _env_int(name: str, default: int) -> int:
 ANALYSIS_SEMAPHORE = threading.BoundedSemaphore(
     _env_int("HIBRIA_MAX_CONCURRENT_ANALYSES", 1)
 )
+ANALYSIS_QUEUE_TIMEOUT = _env_int("HIBRIA_ANALYSIS_QUEUE_TIMEOUT_SECONDS", 600)
 
 
 def _mark_cache(
@@ -58,6 +59,26 @@ def _mark_cache(
     return payload
 
 
+def _is_complete_analysis(data: object) -> bool:
+    if not isinstance(data, dict):
+        return False
+    analysis = data.get("analysis")
+    if not isinstance(analysis, dict):
+        return False
+    score = analysis.get("score")
+    label = analysis.get("label")
+    explanation = data.get("explanation")
+    return (
+        isinstance(score, (int, float))
+        and not isinstance(score, bool)
+        and 0 <= float(score) <= 100
+        and isinstance(label, str)
+        and bool(label.strip())
+        and isinstance(explanation, str)
+        and bool(explanation.strip())
+    )
+
+
 def _cached_response(
     repository: AnalysisRepository,
     request: AnalyzeRequest,
@@ -70,6 +91,8 @@ def _cached_response(
         content=request.content,
     )
     if cached is None:
+        return None
+    if not _is_complete_analysis(cached.data):
         return None
 
     return AnalyzeResponse(
@@ -96,7 +119,14 @@ def analyze(request: AnalyzeRequest):
 
         # Na instância de 8 GB, o padrão é executar uma análise pesada por vez.
         # As demais requisições aguardam e verificam o cache novamente.
-        with ANALYSIS_SEMAPHORE:
+        acquired = ANALYSIS_SEMAPHORE.acquire(timeout=ANALYSIS_QUEUE_TIMEOUT)
+        if not acquired:
+            raise HTTPException(
+                status_code=503,
+                detail="Servidor ocupado. Tente novamente em alguns minutos.",
+            )
+
+        try:
             cached_response = _cached_response(repository, request)
             if cached_response is not None:
                 return cached_response
@@ -108,9 +138,14 @@ def analyze(request: AnalyzeRequest):
             )
 
             data = result.response or result.to_dict()
-            processing_time = sum(
-                float(value)
-                for value in getattr(result, "_processing_time", {}).values()
+            if not _is_complete_analysis(data):
+                raise RuntimeError(
+                    "A análise terminou sem score ou classificação final; "
+                    "o resultado incompleto não foi salvo no cache."
+                )
+
+            processing_time = float(
+                getattr(result, "_processing_time", {}).get("total", 0.0)
             )
 
             analysis_id = repository.save(
@@ -143,6 +178,11 @@ def analyze(request: AnalyzeRequest):
                 ),
                 error=None,
             )
+        finally:
+            ANALYSIS_SEMAPHORE.release()
+
+    except HTTPException:
+        raise
 
     except ExtractionError as e:
         return AnalyzeResponse(
