@@ -538,19 +538,24 @@ class ClaimDetector:
             )
             claims.append(claim)
 
-            if len(claims) >= max_claims:
-                logger.info(
-                    f"[claim_detector] limite de {max_claims} claims atingido"
-                )
-                break
-
         # ordena por confiança decrescente — retriever processa os mais fortes primeiro
         claims.sort(key=lambda c: c.confidence, reverse=True)
+        detected_before_limit = len(claims)
+        claims = claims[:max_claims]
 
-        total = len(claims) + sum(discarded.values())
+        if detected_before_limit > max_claims:
+            logger.info(
+                "[claim_detector] %s claims detectadas; usando as %s mais fortes",
+                detected_before_limit,
+                max_claims,
+            )
+
+        total = len(sentences)
         stats = {
             "sentences_processed": total,
             "claims_found":        len(claims),
+            "claims_before_limit": detected_before_limit,
+            "claims_truncated": max(0, detected_before_limit - len(claims)),
             "discarded_opinion":   discarded[ClaimType.OPINION],
             "discarded_rhetorical": discarded[ClaimType.RHETORICAL],
             "discarded_noise":     discarded[ClaimType.NOISE],

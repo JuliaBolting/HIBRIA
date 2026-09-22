@@ -65,6 +65,45 @@ class ExplanationGenerator:
         "additionalProperties": False,
     }
 
+    @staticmethod
+    def fallback_report(result: Any) -> dict[str, Any]:
+        """Explicação determinística quando o serviço local não responde."""
+        label = str(getattr(result, "label_final", None) or "não verificado")
+        breakdown = getattr(result, "score_breakdown", None) or {}
+        coverage = breakdown.get("coverage_score")
+        stance = breakdown.get("stance_stats") or {}
+
+        try:
+            coverage_value = max(0.0, min(1.0, float(coverage)))
+        except (TypeError, ValueError):
+            coverage_value = 0.0
+
+        if coverage_value >= 0.60:
+            coverage_text = "A maior parte das afirmações recebeu evidência suficiente."
+        elif coverage_value >= 0.30:
+            coverage_text = "Apenas parte das afirmações recebeu evidência suficiente."
+        else:
+            coverage_text = "Poucas afirmações receberam evidência suficiente."
+
+        contradictions = int(stance.get("contradict", 0) or 0)
+        supports = int(stance.get("support", 0) or 0)
+        relation_text = (
+            f"Foram identificados {supports} apoios e {contradictions} contradições nas comparações válidas."
+        )
+
+        reputation = getattr(result, "reputation", None) or {}
+        if reputation.get("status") == "evaluated":
+            reputation_text = "A reputação dinâmica da fonte também foi considerada."
+        else:
+            reputation_text = "A fonte ainda não tinha reputação dinâmica completa."
+
+        return {
+            "explanation": (
+                f'A HÍBRIA classificou a notícia como "{label}". {coverage_text}'
+            )[:300],
+            "details": [coverage_text, relation_text[:160], reputation_text],
+        }
+
     @classmethod
     def generate(cls, result: Any) -> dict[str, Any] | None:
         """
@@ -242,6 +281,7 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
         claims = getattr(result, "claims", None)
         stance_results = getattr(result, "stance_results", None)
         retrieval_results = getattr(result, "retrieval_results", None)
+        text_features = getattr(result, "text_features", None)
         title = getattr(result, "title", "") or ""
 
         claim_texts: list[str] = []
@@ -336,6 +376,14 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
                 if value is not None:
                     reputation_summary[key] = value
 
+        text_feature_summary: dict[str, Any] = {}
+        if isinstance(text_features, dict) and text_features.get("status") == "ok":
+            text_feature_summary = {
+                "label": text_features.get("label"),
+                "flags": list(text_features.get("flags") or [])[:5],
+                "nota": "sinal auxiliar de linguagem; não determina a veracidade",
+            }
+
         context = {
             "titulo": title[:300],
             "resultado_calculado": {
@@ -343,6 +391,7 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
             },
             "componentes": safe_breakdown,
             "reputacao_fonte": reputation_summary,
+            "sinais_textuais_auxiliares": text_feature_summary,
             "claims_principais": claim_texts,
             "relacoes_claim_evidencia": stance_summary,
             "amostra_evidencias_recuperadas": evidence_summary,
