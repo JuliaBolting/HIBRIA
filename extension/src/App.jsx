@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { captureCurrentPage } from "./services/pageCapture";
 import { analyzePage } from "./services/api";
 import "./App.css";
@@ -16,21 +16,15 @@ const STEPS = [
   },
   {
     id: "analysis",
-    label: "Analisando linguagem",
+    label: "Processando no servidor",
     icon: "/languages.png",
     color: "#06bad1",
   },
   {
-    id: "evidence",
-    label: "Cruzando fontes externas",
+    id: "validation",
+    label: "Validando o resultado",
     icon: "/globe.png",
     color: "#8b44ef",
-  },
-  {
-    id: "explanation",
-    label: "Gerando relatório",
-    icon: "/chart-column.png",
-    color: "#f59e0b",
   },
 ];
 
@@ -43,6 +37,7 @@ function App() {
   const [currentStep, setCurrentStep] = useState(0);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const abortControllerRef = useRef(null);
 
   const [theme, setTheme] = useState(
     () => localStorage.getItem("hibria-theme") || "light"
@@ -57,6 +52,11 @@ function App() {
     localStorage.setItem("hibria-theme", theme);
   }, [theme]);
 
+  useEffect(
+    () => () => abortControllerRef.current?.abort(),
+    []
+  );
+
   function toggleTheme() {
     setTheme((current) =>
       current === "dark" ? "light" : "dark"
@@ -68,6 +68,10 @@ function App() {
      ======================================================= */
 
   async function handleAnalyze() {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setError("");
     setResult(null);
     setCurrentStep(0);
@@ -92,32 +96,18 @@ function App() {
         url: page.url,
         title: page.title,
         content: page.content,
+        signal: controller.signal,
       });
-
-      /*
-       * Pequeno intervalo apenas para permitir
-       * que a interface mostre visualmente a etapa.
-       */
-
-      await wait(400);
-
-      /* -----------------------------------------------
-         3. CRUZAMENTO DE FONTES
-         ----------------------------------------------- */
-
-      setCurrentStep(2);
 
       const data = await analysisPromise;
 
-      await wait(400);
+      setCurrentStep(2);
 
-      /* -----------------------------------------------
-         4. GERAÇÃO DO RELATÓRIO
-         ----------------------------------------------- */
-
-      setCurrentStep(3);
-
-      await wait(500);
+      if (getScore(data) === null || !getResultLabel(data)) {
+        throw new Error(
+          "O servidor devolveu uma análise incompleta. Tente novamente."
+        );
+      }
 
       /* -----------------------------------------------
          5. RESULTADO
@@ -126,6 +116,9 @@ function App() {
       setResult(data);
       setScreen("result");
     } catch (err) {
+      if (err?.name === "AbortError") {
+        return;
+      }
       console.error("Erro durante a análise:", err);
 
       setError(
@@ -134,6 +127,10 @@ function App() {
       );
 
       setScreen("home");
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
   }
 
@@ -142,6 +139,8 @@ function App() {
      ======================================================= */
 
   function handleNewAnalysis() {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     setScreen("home");
     setCurrentStep(0);
     setResult(null);
@@ -156,7 +155,7 @@ function App() {
     <div
       className={`app-shell view-${screen}`}
       style={{
-        "--score": getScore(result),
+        "--score": getScore(result) ?? 0,
         "--result-color": getResultColor(result),
       }}
     >
@@ -427,13 +426,13 @@ function ScoreRing({ result }) {
     <div
       className="score-ring"
       style={{
-        "--score": score,
+        "--score": score ?? 0,
         "--result-color": color,
       }}
     >
       <div className="score-content">
         <strong>
-          {formatScore(score)}%
+          {score === null ? "—" : `${formatScore(score)}%`}
         </strong>
 
         <span>confiabilidade</span>
@@ -453,13 +452,16 @@ function getScore(result) {
     result?.score_final ??
     result?.overall_score ??
     result?.hybrid_score ??
-    result?.analysis?.score ??
-    0;
+    result?.analysis?.score;
+
+  if (score === undefined || score === null || score === "") {
+    return null;
+  }
 
   const numericScore = Number(score);
 
-  if (Number.isNaN(numericScore)) {
-    return 0;
+  if (!Number.isFinite(numericScore)) {
+    return null;
   }
 
   return Math.max(
@@ -497,6 +499,8 @@ function getVerdict(result) {
   }
 
   const score = getScore(result);
+
+  if (score === null) return "Resultado indisponível";
 
   if (score >= 70) return "Confiável";
   if (score >= 40) return "Parcialmente confiável";
@@ -675,16 +679,6 @@ function formatStatus(value) {
     text.charAt(0).toUpperCase() +
     text.slice(1)
   );
-}
-
-/* =========================================================
-   UTILITÁRIO
-   ========================================================= */
-
-function wait(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
 
 export default App;

@@ -79,5 +79,10 @@ export async function captureCurrentPage() {
     );
   }
 
+  // Mantém a requisição abaixo do limite da API e evita enviar menus/rodapés
+  // enormes quando foi necessário usar document.body como fallback.
+  page.title = String(page.title || "").slice(0, 500);
+  page.content = String(page.content || "").slice(0, 180_000);
+
   return page;
 }
