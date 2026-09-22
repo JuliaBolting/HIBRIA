@@ -135,6 +135,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# O pacote carregável da extensão é versionado para testes no Chrome.
+!extension/dist/
+!extension/dist/**
+
 # =============================================================================
 # VSCODE / IDES
 # =============================================================================
