@@ -4,8 +4,8 @@ import os
 import time
 import requests
 
-from .config import DEFAULT_TIMEOUT, env_flag, env_float, env_int, valid_api_key
-from .quota import DailyQuota
+from .config import DEFAULT_TIMEOUT, env_flag, env_float, valid_api_key
+from .quota import ProviderQuota
 from .models import SearchHit
 
 
@@ -16,13 +16,14 @@ class GoogleFactCheckProvider:
     def __init__(self) -> None:
         self.api_key = os.getenv("GOOGLE_FACTCHECK_API_KEY", "").strip()
         self.enabled = env_flag("HIBRIA_ENABLE_FACTCHECK", False) or env_flag("HIBRIA_REPUTATION_USE_CONFIGURED_PROVIDERS", True)
-        self.daily_limit = env_int("HIBRIA_FACTCHECK_DAILY_LIMIT", 100)
         self.sleep_seconds = env_float("HIBRIA_FACTCHECK_SLEEP_SECONDS", 0.5)
 
     def is_available(self) -> bool:
-        return self.enabled and valid_api_key(self.api_key) and DailyQuota.can_use(self.name, self.daily_limit)
+        return self.enabled and valid_api_key(self.api_key) and ProviderQuota.can_use(self.name)
 
     def search(self, query: str, max_results: int = 5) -> list[SearchHit]:
+        if not ProviderQuota.try_register(self.name):
+            return []
         response = requests.get(
             self.API_URL,
             params={
@@ -34,7 +35,6 @@ class GoogleFactCheckProvider:
             timeout=DEFAULT_TIMEOUT,
         )
         response.raise_for_status()
-        DailyQuota.register(self.name)
         if self.sleep_seconds > 0:
             time.sleep(self.sleep_seconds)
         data = response.json()

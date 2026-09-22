@@ -7,51 +7,12 @@ from pathlib import Path
 import threading
 
 
-class DailyQuota:
-    """Contador local simples compartilhado pelos provedores da reputação."""
-
-    _lock = threading.Lock()
-    _path = Path("data/runtime/reputation_search_quotas.json")
-
-    @classmethod
-    def can_use(cls, provider: str, limit: int) -> bool:
-        if limit <= 0:
-            return True
-        with cls._lock:
-            data = cls._read()
-            return int(data.get(provider, 0)) < limit
-
-    @classmethod
-    def register(cls, provider: str) -> None:
-        with cls._lock:
-            data = cls._read()
-            data[provider] = int(data.get(provider, 0)) + 1
-            cls._path.parent.mkdir(parents=True, exist_ok=True)
-            cls._path.write_text(json.dumps({"date": cls._today(), "counts": data}, indent=2), encoding="utf-8")
-
-    @classmethod
-    def _today(cls) -> str:
-        return datetime.now().strftime("%Y-%m-%d")
-
-    @classmethod
-    def _read(cls) -> dict[str, int]:
-        if not cls._path.exists():
-            return {}
-        try:
-            payload = json.loads(cls._path.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-        if payload.get("date") != cls._today():
-            return {}
-        return {key: int(value) for key, value in (payload.get("counts") or {}).items()}
-
-
 class ProviderQuota:
     """Contador compartilhado para provedores com franquias diferentes.
 
-    Os contadores de Serper, SerpApi e SearchAPI são usados tanto pelo RAG
-    quanto pela avaliação de reputação. Limite igual a zero significa que o
-    respectivo período não será limitado localmente.
+    Os contadores são usados tanto pelo RAG quanto pela avaliação de reputação,
+    impedindo que duas partes do sistema gastem a mesma franquia como se fossem
+    independentes. Limite igual a zero desativa o limite local do período.
     """
 
     _lock = threading.Lock()
@@ -65,6 +26,20 @@ class ProviderQuota:
         "serper": {"daily": 0, "monthly": 0, "total": 2500},
         "serpapi": {"daily": 0, "monthly": 250, "total": 0},
         "searchapi": {"daily": 0, "monthly": 0, "total": 100},
+        "brave": {"daily": 80, "monthly": 0, "total": 0},
+        "tavily": {"daily": 80, "monthly": 0, "total": 0},
+        "google_factcheck": {"daily": 100, "monthly": 0, "total": 0},
+        "bing": {"daily": 80, "monthly": 0, "total": 0},
+        "gdelt": {"daily": 40, "monthly": 0, "total": 0},
+        "newsapi": {"daily": 80, "monthly": 0, "total": 0},
+        "crawlee": {"daily": 40, "monthly": 0, "total": 0},
+        "ai_fallback": {"daily": 20, "monthly": 0, "total": 0},
+    }
+    _legacy_daily_env = {
+        "brave": "HIBRIA_WEB_SEARCH_DAILY_LIMIT",
+        "google_factcheck": "HIBRIA_FACTCHECK_DAILY_LIMIT",
+        "bing": "HIBRIA_BING_SEARCH_DAILY_LIMIT",
+        "crawlee": "HIBRIA_CRAWLEE_DAILY_LIMIT",
     }
 
     @classmethod
@@ -109,10 +84,14 @@ class ProviderQuota:
             provider,
             {"daily": 0, "monthly": 0, "total": 0},
         )
-        return {
+        limits = {
             period: cls._env_int(f"{prefix}_{period.upper()}_LIMIT", default)
             for period, default in defaults.items()
         }
+        legacy_daily = cls._legacy_daily_env.get(provider)
+        if legacy_daily and os.getenv(f"{prefix}_DAILY_LIMIT") is None:
+            limits["daily"] = cls._env_int(legacy_daily, limits["daily"])
+        return limits
 
     @classmethod
     def _within_limits(cls, provider: str, data: dict) -> bool:

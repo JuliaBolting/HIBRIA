@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 import requests
 
-from .config import DEFAULT_TIMEOUT, env_flag, env_int, valid_api_key
-from .quota import DailyQuota
+from .config import DEFAULT_TIMEOUT, env_flag, valid_api_key
+from .quota import ProviderQuota
 from .models import SearchHit
 
 
@@ -22,12 +22,13 @@ class BingSearchProvider:
         ).strip()
         # Se a chave existe, o provedor pode ser usado. A flag opcional permite desligar.
         self.enabled = env_flag("HIBRIA_ENABLE_BING_SEARCH", bool(self.api_key))
-        self.daily_limit = env_int("HIBRIA_BING_SEARCH_DAILY_LIMIT", 80)
 
     def is_available(self) -> bool:
-        return self.enabled and valid_api_key(self.api_key) and DailyQuota.can_use(self.name, self.daily_limit)
+        return self.enabled and valid_api_key(self.api_key) and ProviderQuota.can_use(self.name)
 
     def search(self, query: str, max_results: int = 5) -> list[SearchHit]:
+        if not ProviderQuota.try_register(self.name):
+            return []
         response = requests.get(
             self.endpoint,
             headers={"Ocp-Apim-Subscription-Key": self.api_key},
@@ -35,7 +36,6 @@ class BingSearchProvider:
             timeout=DEFAULT_TIMEOUT,
         )
         response.raise_for_status()
-        DailyQuota.register(self.name)
         data = response.json()
         return [
             SearchHit(

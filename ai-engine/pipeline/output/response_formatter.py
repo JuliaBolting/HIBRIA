@@ -147,6 +147,17 @@ class ResponseFormatter:
                             "trusted_source",
                             None,
                         ),
+                        "retrieval_layer": getattr(
+                            evidence,
+                            "retrieval_layer",
+                            "",
+                        ),
+                        "source_type": getattr(
+                            evidence,
+                            "source_type",
+                            "",
+                        ),
+                        "metadata": getattr(evidence, "metadata", {}) or {},
                     }
                 )
 
@@ -159,4 +170,3 @@ class ResponseFormatter:
         )
 
         return response
-

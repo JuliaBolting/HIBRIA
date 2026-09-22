@@ -129,7 +129,22 @@ class Aggregator:
         if hasattr(top, "is_sufficient") and not top.is_sufficient:
             return False
 
-        if source_type == "ai_retrieved_web" and not trusted_source:
+        # Checagens profissionais são aceitas pela própria natureza da fonte.
+        if layer == "factcheck" or source_type == "fact_check":
+            return True
+
+        # O FAISS só pode influenciar o resultado quando o item foi aprovado
+        # pela política de memória RAG. Isso impede a notícia analisada (ou um
+        # item não verificado) de servir como evidência de si mesma.
+        if layer == "vector_store":
+            metadata = getattr(top, "metadata", {}) or {}
+            return bool(
+                metadata.get("approved_for_rag") is True or trusted_source
+            )
+
+        # Notícias e páginas recuperadas da web somente contam no score após
+        # a reputação dinâmica do domínio atingir o limiar configurado.
+        if not trusted_source:
             return False
 
         return True
