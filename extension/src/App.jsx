@@ -16,15 +16,21 @@ const STEPS = [
   },
   {
     id: "analysis",
-    label: "Processando no servidor",
+    label: "Analisando linguagem",
     icon: "/languages.png",
     color: "#06bad1",
   },
   {
-    id: "validation",
-    label: "Validando o resultado",
+    id: "evidence",
+    label: "Cruzando fontes externas",
     icon: "/globe.png",
     color: "#8b44ef",
+  },
+  {
+    id: "explanation",
+    label: "Gerando relatório",
+    icon: "/chart-column.png",
+    color: "#f59e0b",
   },
 ];
 
@@ -97,17 +103,44 @@ function App() {
         title: page.title,
         content: page.content,
         signal: controller.signal,
-      });
+      }).then(
+        (data) => ({ data, error: null }),
+        (requestError) => ({ data: null, error: requestError })
+      );
 
-      const data = await analysisPromise;
+      // Mantém as quatro etapas visíveis como na interface original,
+      // sem perder o cancelamento real da requisição.
+      await wait(400, controller.signal);
+
+      /* -----------------------------------------------
+         3. CRUZAMENTO DE FONTES
+         ----------------------------------------------- */
 
       setCurrentStep(2);
+
+      const outcome = await analysisPromise;
+
+      if (outcome.error) {
+        throw outcome.error;
+      }
+
+      const data = outcome.data;
 
       if (getScore(data) === null || !getResultLabel(data)) {
         throw new Error(
           "O servidor devolveu uma análise incompleta. Tente novamente."
         );
       }
+
+      await wait(400, controller.signal);
+
+      /* -----------------------------------------------
+         4. GERAÇÃO DO RELATÓRIO
+         ----------------------------------------------- */
+
+      setCurrentStep(3);
+
+      await wait(500, controller.signal);
 
       /* -----------------------------------------------
          5. RESULTADO
@@ -679,6 +712,32 @@ function formatStatus(value) {
     text.charAt(0).toUpperCase() +
     text.slice(1)
   );
+}
+
+/* =========================================================
+   UTILITÁRIO
+   ========================================================= */
+
+function wait(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Análise cancelada.", "AbortError"));
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      signal?.removeEventListener("abort", handleAbort);
+      resolve();
+    }, ms);
+
+    function handleAbort() {
+      window.clearTimeout(timeout);
+      signal?.removeEventListener("abort", handleAbort);
+      reject(new DOMException("Análise cancelada.", "AbortError"));
+    }
+
+    signal?.addEventListener("abort", handleAbort, { once: true });
+  });
 }
 
 export default App;
