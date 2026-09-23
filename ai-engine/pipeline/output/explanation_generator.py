@@ -109,7 +109,7 @@ class ExplanationGenerator:
 
         return {
             "explanation": (
-                f'A HÍBRIA classificou a notícia como "{label}". {coverage_text}'
+                f'O resultado foi "{label}". {coverage_text}'
             )[:300],
             "details": [coverage_text, relation_text[:160], reputation_text],
         }
@@ -207,7 +207,11 @@ class ExplanationGenerator:
                 else None
             )
 
-            report = cls._parse_report(raw_content)
+            classification_details = cls._deterministic_details(result)
+            report = cls._parse_report(
+                raw_content,
+                fallback_details=classification_details,
+            )
 
             if report is None:
                 logger.warning(
@@ -215,6 +219,11 @@ class ExplanationGenerator:
                     f"Conteúdo recebido: {str(raw_content)[:1500]}"
                 )
                 return None
+
+            # Os detalhes explicam somente os fatores da classificação. O Qwen
+            # redige a explicação curta, mas não transforma os tópicos em um
+            # resumo das informações encontradas durante a busca.
+            report["details"] = classification_details
 
             logger.info(
                 "[explanation_generator] relatório gerado com sucesso "
@@ -282,9 +291,12 @@ REGRAS OBRIGATÓRIAS:
 - Quando a informação principal tiver apoio externo, nunca diga depois que ela
   ficou sem confirmação. Nesse caso, a cobertura baixa se refere às demais
   informações verificáveis da notícia.
-- Explique por que a HÍBRIA atribuiu a classificação apresentada. A HÍBRIA é
-  responsável pelo resultado; nenhuma fonte externa deve aparecer como autora
-  do veredito.
+- Explique por que a classificação apresentada foi atribuída. O resultado
+  pertence ao sistema; nenhuma fonte externa deve aparecer como autora do
+  veredito.
+- Na resposta ao usuário, use voz impessoal: "a análise encontrou", "o
+  resultado indica" ou "as evidências consultadas mostram". Nunca escreva "a
+  HÍBRIA encontrou", "a HÍBRIA classificou" ou "a HÍBRIA atribuiu".
 - O leitor não conhece as claims internas. Nunca escreva "claim", "primeira
   afirmação", "segunda afirmação" ou "terceira afirmação". Reescreva o fato
   específico em linguagem comum, por exemplo: "A escalação do ator recebeu
@@ -295,7 +307,7 @@ REGRAS OBRIGATÓRIAS:
   necessário para compreender um fato concreto, cite no máximo uma referência
   em toda a resposta e trate-a apenas como material consultado.
 - Não diga que uma fonte provou que a notícia é verdadeira ou falsa. Em caso de
-  divergência, diga que a HÍBRIA encontrou informações divergentes.
+  divergência, diga que a análise encontrou informações divergentes.
 - Não use as expressões "polaridade", "sobreposição", "similaridade",
   "base de dados", "componentes" ou "a conclusão não é válida".
 - Não escreva frases vagas como "a evidência é relevante" ou "há dados
@@ -308,6 +320,9 @@ REGRAS OBRIGATÓRIAS:
 - Nunca corte uma palavra nem termine com abreviação causada por corte de texto.
 - Não numere os detalhes e não coloque marcadores como "1.", "2.", "3." ou
   hífens. A interface adicionará os marcadores automaticamente.
+- Os detalhes devem explicar somente os motivos da classificação. Não use os
+  detalhes para contar assuntos, pessoas, datas ou curiosidades descobertas
+  durante a pesquisa.
 
 A saída deve conter:
 - "explanation": uma ou duas frases completas, com no máximo 300 caracteres.
@@ -544,6 +559,87 @@ detalhes exatamente a mesma informação da explicação.
 
         return selected
 
+    @classmethod
+    def _deterministic_details(cls, result: Any) -> list[str]:
+        """Explica os três fatores do resultado sem resumir fatos pesquisados."""
+        breakdown = getattr(result, "score_breakdown", None) or {}
+        stance = breakdown.get("stance_stats") or {}
+        supports = int(stance.get("support", 0) or 0)
+        contradictions = int(stance.get("contradict", 0) or 0)
+        neutral = int(stance.get("neutral", 0) or 0)
+
+        if supports and contradictions:
+            comparison_text = (
+                "As comparações apresentaram tanto apoio quanto divergências "
+                "em relação às evidências externas."
+            )
+        elif contradictions:
+            comparison_text = (
+                "Foram encontradas divergências entre as informações da notícia "
+                "e as evidências externas consultadas."
+            )
+        elif supports:
+            comparison_text = (
+                "As comparações encontraram apoio externo e não identificaram "
+                "divergências relevantes."
+            )
+        elif neutral:
+            comparison_text = (
+                "As evidências encontradas forneceram contexto, mas não uma "
+                "confirmação direta suficiente."
+            )
+        else:
+            comparison_text = (
+                "Não houve comparações conclusivas suficientes para confirmar "
+                "ou contradizer as informações analisadas."
+            )
+
+        coverage = cls._coverage_description(breakdown.get("coverage_score"))
+        if coverage == "ampla":
+            coverage_text = (
+                "A cobertura foi ampla, pois a maior parte das informações "
+                "verificáveis recebeu evidência suficiente."
+            )
+        elif coverage == "parcial":
+            coverage_text = (
+                "A cobertura foi parcial, pois apenas parte das informações "
+                "verificáveis recebeu confirmação suficiente."
+            )
+        elif coverage == "baixa":
+            coverage_text = (
+                "A cobertura foi baixa, pois poucas informações verificáveis "
+                "receberam confirmação externa suficiente."
+            )
+        else:
+            coverage_text = (
+                "A cobertura foi insuficiente, pois não houve confirmação externa "
+                "bastante para as informações verificáveis."
+            )
+
+        label = str(getattr(result, "label_final", None) or "").casefold()
+        if label in {"evidência insuficiente", "não verificado"}:
+            meaning_text = (
+                "A falta de confirmação para parte do conteúdo reduziu a "
+                "classificação, mas não significa, por si só, que a notícia seja falsa."
+            )
+        elif label == "não confiável":
+            meaning_text = (
+                "As divergências tiveram impacto decisivo na classificação; o "
+                "resultado deve ser considerado junto de outras fontes."
+            )
+        elif label == "confiável":
+            meaning_text = (
+                "A boa cobertura e o predomínio de apoio elevaram a classificação, "
+                "sem representar uma garantia absoluta de veracidade."
+            )
+        else:
+            meaning_text = (
+                "A combinação entre apoios e limitações de cobertura resultou em "
+                "uma classificação intermediária."
+            )
+
+        return [comparison_text, coverage_text, meaning_text]
+
     @staticmethod
     def _truncate_text(value: Any, max_chars: int) -> str:
         """Reduz um texto sem deixar fragmentos de palavras como "pi"."""
@@ -669,13 +765,12 @@ A "explanation" deve ter no máximo 300 caracteres e explicar somente o principa
 motivo da classificação final. Se a informação principal tiver apoio, diga isso.
 Se a cobertura for baixa, atribua a falta de confirmação às demais informações
 verificáveis da notícia, sem tratar isso como falsidade.
-Use "fatores_que_formaram_o_resultado" para explicar a decisão global da
-HÍBRIA. Use as comparações somente para dar exemplos concretos.
+Use "fatores_que_formaram_o_resultado" para explicar a decisão global. Use as
+comparações somente para dar exemplos concretos.
 
-Os três itens de "details" devem explicar, nesta ordem, o que a HÍBRIA encontrou
-sobre a informação principal; o que ficou confirmado, divergente ou sem
-confirmação nas demais informações; e como a cobertura, as divergências e os
-fatores complementares afetaram a classificação.
+Os três itens de "details" devem explicar, nesta ordem, o resultado das
+comparações com evidências; como a cobertura afetou o resultado; e o que a
+classificação significa. Não conte fatos descobertos durante a pesquisa.
 
 Não coloque números, hífens ou bolinhas no início dos detalhes. Não enumere
 informações como "primeira afirmação". Não copie nomes de campos nem
@@ -694,6 +789,7 @@ CONTEXTO:
     def _parse_report(
         cls,
         raw_content: Any,
+        fallback_details: list[str] | None = None,
     ) -> dict[str, Any] | None:
 
         if not isinstance(
@@ -777,7 +873,7 @@ CONTEXTO:
         ):
             return None
 
-        details: list[str] = []
+        raw_clean_details: list[str] = []
 
         for item in raw_details:
             text = cls._normalize_model_text(item)
@@ -790,13 +886,29 @@ CONTEXTO:
             if not text:
                 continue
 
-            if text not in details:
-                details.append(
-                    cls._limit_output_text(text, 260)
-                )
+            raw_clean_details.append(
+                cls._limit_output_text(text, 260)
+            )
 
+            if len(raw_clean_details) >= 3:
+                break
+
+        normalized_unique = {
+            item.casefold()
+            for item in raw_clean_details
+        }
+        repeated_details = len(normalized_unique) != len(raw_clean_details)
+
+        details: list[str] = [] if repeated_details else raw_clean_details
+
+        for item in fallback_details or []:
             if len(details) >= 3:
                 break
+            text = cls._normalize_model_text(item)
+            if not text:
+                continue
+            if text.casefold() not in {detail.casefold() for detail in details}:
+                details.append(cls._limit_output_text(text, 260))
 
         if len(details) != 3:
             return None
@@ -810,7 +922,18 @@ CONTEXTO:
     def _normalize_model_text(value: Any) -> str:
         """Normaliza espaços e pequenos erros recorrentes do modelo local."""
         text = " ".join(str(value or "").split())
-        return re.sub(r"\bH[IÍ]BRA\b", "HÍBRIA", text, flags=re.IGNORECASE)
+        text = re.sub(
+            r"\bA\s+H[IÍ](?:BRIA|BIRA|BRA)\b",
+            "A análise",
+            text,
+            flags=re.IGNORECASE,
+        )
+        return re.sub(
+            r"\bH[IÍ](?:BRIA|BIRA|BRA)\b",
+            "HÍBRIA",
+            text,
+            flags=re.IGNORECASE,
+        )
 
     @staticmethod
     def _env_int(
