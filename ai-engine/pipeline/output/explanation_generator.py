@@ -35,23 +35,29 @@ class ExplanationGenerator:
     DEFAULT_MODEL = "qwen3:0.6b"
     DEFAULT_TIMEOUT = 120
     MAX_INPUT_CHARS = 4000
+    RELATION_LABELS = {
+        "support": "há apoio externo para esta informação",
+        "contradict": "foi encontrada informação divergente",
+        "neutral": "há apenas contexto, sem confirmação direta",
+        "insufficient": "não houve confirmação externa suficiente",
+    }
 
     OUTPUT_SCHEMA = {
         "type": "object",
         "properties": {
             "explanation": {
                 "type": "string",
-                "maxLength": 300,
+                "maxLength": 480,
                 "description": (
-                    "Explicação curta do resultado em português do Brasil, "
-                    "com no máximo duas frases."
+                    "Explicação objetiva do resultado em português do Brasil, "
+                    "com duas ou três frases completas."
                 ),
             },
             "details": {
                 "type": "array",
                 "items": {
                     "type": "string",
-                    "maxLength": 160,
+                    "maxLength": 260,
                 },
                 "minItems": 3,
                 "maxItems": 3,
@@ -74,7 +80,10 @@ class ExplanationGenerator:
         stance = breakdown.get("stance_stats") or {}
 
         try:
-            coverage_value = max(0.0, min(1.0, float(coverage)))
+            coverage_value = float(coverage)
+            if coverage_value > 1.0:
+                coverage_value /= 100.0
+            coverage_value = max(0.0, min(1.0, coverage_value))
         except (TypeError, ValueError):
             coverage_value = 0.0
 
@@ -155,7 +164,10 @@ class ExplanationGenerator:
                     "top_p": 0.8,
                     "top_k": 20,
                     "num_ctx": 4096,
-                    "num_predict": 220,
+                    "num_predict": cls._env_int(
+                        "HIBRIA_QWEN_MAX_OUTPUT_TOKENS",
+                        420,
+                    ),
                 },
                 "keep_alive": "10m",
             }
@@ -259,18 +271,45 @@ REGRAS OBRIGATÓRIAS:
 - Considere somente a classificação final como o resultado oficial.
 - A reputação da fonte é apenas um fator complementar.
 - Ausência de evidência não significa falsidade.
+- Evidência insuficiente não torna uma afirmação falsa ou inválida; significa
+  apenas que o sistema não encontrou confirmação externa bastante.
 - Só diga que há contradição quando as evidências fornecidas realmente
   indicarem contradição.
+- Se um par indicar apoio externo, diga que aquela informação recebeu apoio.
+  Não chame essa evidência isolada de insuficiente apenas porque a classificação
+  global é "evidência insuficiente".
+- Explique por que a HÍBRIA atribuiu a classificação apresentada. A HÍBRIA é
+  responsável pelo resultado; nenhuma fonte externa deve aparecer como autora
+  do veredito.
+- O leitor não conhece as claims internas. Nunca escreva "claim", "primeira
+  afirmação", "segunda afirmação" ou "terceira afirmação". Reescreva o fato
+  específico em linguagem comum, por exemplo: "A escalação do ator recebeu
+  confirmação externa".
+- Explique primeiro o que foi encontrado sobre a informação principal da
+  notícia, depois o que ficou sem confirmação e como isso afetou o resultado.
+- Normalmente não cite nomes de sites ou veículos. Quando for realmente
+  necessário para compreender um fato concreto, cite no máximo uma referência
+  em toda a resposta e trate-a apenas como material consultado.
+- Não diga que uma fonte provou que a notícia é verdadeira ou falsa. Em caso de
+  divergência, diga que a HÍBRIA encontrou informações divergentes.
+- Não use as expressões "polaridade", "sobreposição", "similaridade",
+  "base de dados", "componentes" ou "a conclusão não é válida".
+- Não escreva frases vagas como "a evidência é relevante" ou "há dados
+  suficientes" sem dizer qual informação foi encontrada.
 - Escreva para uma pessoa comum, sem linguagem técnica.
 - Não use Markdown.
 - Não explique seu raciocínio.
 - Responda em português do Brasil.
+- Termine a explicação e cada detalhe com uma frase completa e pontuação final.
+- Nunca corte uma palavra nem termine com abreviação causada por corte de texto.
 
 A saída deve conter:
-- "explanation": uma ou duas frases curtas, com no máximo 300 caracteres.
-- "details": exatamente três frases curtas, cada uma com no máximo 160 caracteres.
+- "explanation": duas ou três frases, com no máximo 480 caracteres.
+- "details": exatamente três frases concretas, cada uma com no máximo 260
+  caracteres.
 
-Não repita nos detalhes exatamente a mesma informação da explicação.
+Cada detalhe deve abordar uma informação ou um fator diferente. Não repita nos
+detalhes exatamente a mesma informação da explicação.
 """.strip()
 
     @classmethod
@@ -284,82 +323,41 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
         title = getattr(result, "title", "") or ""
 
         claim_texts: list[str] = []
-        for claim in (claims or [])[:3]:
+        for claim in (claims or [])[:5]:
             text = getattr(claim, "text", None)
             if text:
-                claim_texts.append(str(text)[:220])
+                claim_texts.append(cls._truncate_text(text, 240))
 
-        stance_summary: list[dict[str, Any]] = []
-        for item in (stance_results or [])[:5]:
-            try:
-                if hasattr(item, "to_dict"):
-                    item = item.to_dict()
+        evidence_pairs = cls._build_evidence_pairs(
+            retrieval_results or [],
+            stance_results or [],
+        )
 
-                if not isinstance(item, dict):
-                    continue
+        coverage_description = cls._coverage_description(
+            (breakdown or {}).get("coverage_score")
+            if isinstance(breakdown, dict)
+            else None
+        )
 
-                stance_summary.append(
-                    {
-                        "stance": item.get("stance"),
-                        "confidence": item.get("confidence"),
-                        "reason": str(item.get("reason") or "")[:160],
-                        "source": str(item.get("source") or "")[:100],
-                    }
-                )
-
-            except Exception:
-                continue
-
-        evidence_summary: list[dict[str, Any]] = []
-
-        for retrieval in (retrieval_results or [])[:3]:
-            claim = getattr(retrieval, "claim", None)
-            claim_text = str(
-                getattr(claim, "text", "") or ""
-            )[:220]
-
-            for evidence in list(
-                getattr(retrieval, "evidences", []) or []
-            )[:1]:
-
-                evidence_summary.append(
-                    {
-                        "claim": claim_text,
-                        "source": str(
-                            getattr(evidence, "source", "") or ""
-                        )[:100],
-                        "title": str(
-                            getattr(evidence, "title", "") or ""
-                        )[:140],
-                        "stance": getattr(
-                            evidence,
-                            "stance",
-                            None,
-                        ),
-                        "trusted_source": getattr(
-                            evidence,
-                            "trusted_source",
-                            None,
-                        ),
-                        "excerpt": str(
-                            getattr(evidence, "text", "") or ""
-                        )[:200],
-                    }
-                )
-
-        # Mantemos apenas os dados necessários para explicar
-        # cobertura e relação entre afirmações e evidências.
-        safe_breakdown: dict[str, Any] = {}
-
+        result_factors: dict[str, str] = {
+            "cobertura_das_informacoes": coverage_description,
+        }
         if isinstance(breakdown, dict):
-            for key in (
-                "evidence_score",
-                "coverage_score",
-                "reputation_status",
-                "stance_stats",
-            ):
-                if key in breakdown:
-                    safe_breakdown[key] = breakdown.get(key)
+            result_factors.update(
+                {
+                    "forca_da_confirmacao_externa": cls._score_description(
+                        breakdown.get("evidence_score")
+                    ),
+                    "resultado_das_comparacoes": cls._stance_description(
+                        breakdown.get("stance_stats")
+                    ),
+                    "sinal_auxiliar_da_analise_textual": (
+                        cls._text_signal_description(
+                            breakdown.get("bertimbau_score")
+                        )
+                    ),
+                }
+            )
 
         reputation_summary: dict[str, Any] = {}
 
@@ -367,7 +365,6 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
             for key in (
                 "status",
                 "source_name",
-                "note",
                 "classification",
             ):
                 value = reputation.get(key)
@@ -380,11 +377,10 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
             "resultado_calculado": {
                 "label": label,
             },
-            "componentes": safe_breakdown,
+            "fatores_que_formaram_o_resultado": result_factors,
             "reputacao_fonte": reputation_summary,
-            "claims_principais": claim_texts,
-            "relacoes_claim_evidencia": stance_summary,
-            "amostra_evidencias_recuperadas": evidence_summary,
+            "informacoes_verificaveis": claim_texts,
+            "comparacoes_com_evidencias": evidence_pairs,
         }
 
         prompt = cls._render_prompt(context)
@@ -392,39 +388,27 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
         # Evita cortar JSON no meio.
         # Se ficar grande, reduz progressivamente as amostras.
         if len(prompt) > cls.MAX_INPUT_CHARS:
-            context["amostra_evidencias_recuperadas"] = (
-                evidence_summary[:1]
-            )
+            context["comparacoes_com_evidencias"] = evidence_pairs[:2]
+            context["informacoes_verificaveis"] = claim_texts[:3]
 
-            context["relacoes_claim_evidencia"] = (
-                stance_summary[:3]
-            )
+            prompt = cls._render_prompt(context)
 
-            context["claims_principais"] = (
-                claim_texts[:2]
+        if len(prompt) > cls.MAX_INPUT_CHARS:
+            for pair in context["comparacoes_com_evidencias"]:
+                pair["conteudo_consultado"] = cls._truncate_text(
+                    pair.get("conteudo_consultado"),
+                    180,
+                )
+            context["titulo"] = cls._truncate_text(
+                context.get("titulo"),
+                180,
             )
 
             prompt = cls._render_prompt(context)
 
         if len(prompt) > cls.MAX_INPUT_CHARS:
-            context["amostra_evidencias_recuperadas"] = []
-
-            context["relacoes_claim_evidencia"] = (
-                stance_summary[:2]
-            )
-
-            context["titulo"] = str(
-                context.get("titulo") or ""
-            )[:180]
-
-            prompt = cls._render_prompt(context)
-
-        if len(prompt) > cls.MAX_INPUT_CHARS:
-            context["relacoes_claim_evidencia"] = []
-
-            context["claims_principais"] = (
-                claim_texts[:1]
-            )
+            context["comparacoes_com_evidencias"] = evidence_pairs[:1]
+            context["informacoes_verificaveis"] = claim_texts[:2]
 
             context["reputacao_fonte"] = {
                 key: value
@@ -440,6 +424,222 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
         )
 
         return prompt
+
+    @classmethod
+    def _build_evidence_pairs(
+        cls,
+        retrieval_results: list[Any],
+        stance_results: list[Any],
+    ) -> list[dict[str, Any]]:
+        """Liga cada claim à sua melhor evidência e ao stance correspondente."""
+        stances_by_id: dict[str, dict[str, Any]] = {}
+        stances_by_claim: dict[str, list[dict[str, Any]]] = {}
+
+        for raw_item in stance_results:
+            item = raw_item.to_dict() if hasattr(raw_item, "to_dict") else raw_item
+            if not isinstance(item, dict):
+                continue
+
+            evidence_id = str(item.get("evidence_id") or "")
+            claim_id = str(item.get("claim_id") or "")
+            if evidence_id:
+                stances_by_id[evidence_id] = item
+            if claim_id:
+                stances_by_claim.setdefault(claim_id, []).append(item)
+
+        selected: list[dict[str, Any]] = []
+        relation_priority = {
+            "support": 4,
+            "contradict": 4,
+            "neutral": 2,
+            "insufficient": 1,
+            None: 0,
+        }
+
+        for retrieval in retrieval_results:
+            claim = getattr(retrieval, "claim", None)
+            claim_id = str(getattr(claim, "claim_id", "") or "")
+            claim_text = cls._truncate_text(
+                getattr(claim, "text", ""),
+                260,
+            )
+            candidates: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+            for evidence in list(getattr(retrieval, "evidences", []) or []):
+                evidence_id = str(getattr(evidence, "evidence_id", "") or "")
+                stance_item = stances_by_id.get(evidence_id)
+
+                if stance_item is None:
+                    source = str(getattr(evidence, "source", "") or "")
+                    url = str(getattr(evidence, "url", "") or "")
+                    stance_item = next(
+                        (
+                            item
+                            for item in stances_by_claim.get(claim_id, [])
+                            if (
+                                (url and str(item.get("url") or "") == url)
+                                or (
+                                    source
+                                    and str(item.get("source") or "") == source
+                                )
+                            )
+                        ),
+                        {},
+                    )
+
+                relation = (
+                    stance_item.get("stance")
+                    or getattr(evidence, "stance", None)
+                )
+                confidence = float(stance_item.get("confidence") or 0.0)
+                similarity = float(getattr(evidence, "similarity", 0.0) or 0.0)
+                trusted = bool(getattr(evidence, "trusted_source", False))
+
+                pair = {
+                    "informacao_da_noticia": claim_text,
+                    "referencia_externa_opcional": cls._truncate_text(
+                        getattr(evidence, "source", ""),
+                        100,
+                    ),
+                    "titulo_da_referencia": cls._truncate_text(
+                        getattr(evidence, "title", ""),
+                        180,
+                    ),
+                    "resultado_encontrado_pela_hibria": cls.RELATION_LABELS.get(
+                        relation,
+                        "relação não determinada",
+                    ),
+                    "conteudo_consultado": cls._truncate_text(
+                        getattr(evidence, "text", ""),
+                        340,
+                    ),
+                }
+                rank = (
+                    relation_priority.get(relation, 0),
+                    trusted,
+                    confidence,
+                    similarity,
+                )
+                candidates.append((rank, pair))
+
+            if candidates:
+                candidates.sort(key=lambda item: item[0], reverse=True)
+                selected.append(candidates[0][1])
+
+            if len(selected) >= 3:
+                break
+
+        # Disponibiliza no máximo uma referência nominal ao redator. As demais
+        # comparações continuam completas, mas são explicadas sem atribuir o
+        # veredito da HÍBRIA a veículos externos.
+        for pair in selected[1:]:
+            pair.pop("referencia_externa_opcional", None)
+            pair.pop("titulo_da_referencia", None)
+
+        return selected
+
+    @staticmethod
+    def _truncate_text(value: Any, max_chars: int) -> str:
+        """Reduz um texto sem deixar fragmentos de palavras como "pi"."""
+        text = " ".join(str(value or "").split())
+        if len(text) <= max_chars:
+            return text
+
+        shortened = text[: max_chars + 1]
+        last_space = shortened.rfind(" ")
+        if last_space > 0:
+            shortened = shortened[:last_space]
+        else:
+            shortened = shortened[:max_chars]
+
+        return shortened.rstrip(" ,;:-") + "…"
+
+    @classmethod
+    def _limit_output_text(cls, value: Any, max_chars: int) -> str:
+        """Limita saída extensa preferindo encerrar em uma frase completa."""
+        text = " ".join(str(value or "").split())
+        if len(text) <= max_chars:
+            return text
+
+        candidate = text[: max_chars + 1]
+        sentence_end = max(
+            candidate.rfind("."),
+            candidate.rfind("!"),
+            candidate.rfind("?"),
+        )
+        if sentence_end >= max_chars // 5:
+            return candidate[: sentence_end + 1].strip()
+
+        return cls._truncate_text(text, max_chars)
+
+    @staticmethod
+    def _coverage_description(value: Any) -> str:
+        try:
+            coverage = float(value)
+        except (TypeError, ValueError):
+            return "não informada"
+
+        if coverage > 1.0:
+            coverage /= 100.0
+
+        if coverage >= 0.60:
+            return "ampla"
+        if coverage >= 0.30:
+            return "parcial"
+        if coverage > 0:
+            return "baixa"
+        return "nenhuma"
+
+    @staticmethod
+    def _score_description(value: Any) -> str:
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            return "não disponível"
+
+        if score > 1.0:
+            score /= 100.0
+        if score >= 0.75:
+            return "forte"
+        if score >= 0.50:
+            return "moderada"
+        if score > 0:
+            return "fraca"
+        return "nenhuma"
+
+    @staticmethod
+    def _text_signal_description(value: Any) -> str:
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            return "não disponível"
+
+        if score > 1.0:
+            score /= 100.0
+        if score >= 0.70:
+            return "favorável"
+        if score >= 0.45:
+            return "inconclusivo"
+        return "desfavorável"
+
+    @staticmethod
+    def _stance_description(value: Any) -> str:
+        if not isinstance(value, dict):
+            return "não disponível"
+
+        supports = int(value.get("support", 0) or 0)
+        contradictions = int(value.get("contradict", 0) or 0)
+        neutral = int(value.get("neutral", 0) or 0)
+
+        if contradictions and supports:
+            return "foram encontrados apoios e informações divergentes"
+        if contradictions:
+            return "foram encontradas informações divergentes"
+        if supports:
+            return "foram encontrados apoios, sem divergências identificadas"
+        if neutral:
+            return "houve apenas contexto, sem confirmação direta"
+        return "não houve comparações conclusivas"
 
     @staticmethod
     def _render_prompt(
@@ -460,10 +660,20 @@ Escreva a explicação final da análise usando exclusivamente o contexto abaixo
 Retorne somente o objeto JSON solicitado pelo schema.
 
 A "explanation" deve explicar de forma simples o principal motivo da
-classificação final.
+classificação final. Se a cobertura for baixa, diga que faltou confirmação para
+parte das informações verificáveis da notícia, sem tratar isso como falsidade.
+Use "fatores_que_formaram_o_resultado" para explicar a decisão global da
+HÍBRIA. Use as comparações somente para dar exemplos concretos.
 
-Os três itens de "details" devem destacar fatores concretos encontrados nas
-evidências, sem repetir a explanation.
+Os três itens de "details" devem explicar, nesta ordem:
+1. o que a HÍBRIA encontrou sobre a informação principal, repetindo o fato;
+2. o que ficou confirmado, divergente ou sem confirmação nas demais informações;
+3. como a cobertura, as divergências e os fatores complementares afetaram a
+classificação.
+
+Não enumere informações como "primeira afirmação". Não copie nomes de campos
+nem justificativas técnicas. Cite no máximo uma referência externa e somente se
+ela for indispensável; prefira "evidências externas consultadas".
 
 CONTEXTO:
 {context_json}
@@ -572,17 +782,17 @@ CONTEXTO:
 
             if text not in details:
                 details.append(
-                    text[:160]
+                    cls._limit_output_text(text, 260)
                 )
 
             if len(details) >= 3:
                 break
 
-        if not details:
+        if len(details) != 3:
             return None
 
         return {
-            "explanation": explanation[:300],
+            "explanation": cls._limit_output_text(explanation, 480),
             "details": details,
         }
 
