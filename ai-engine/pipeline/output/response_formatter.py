@@ -69,6 +69,11 @@ class ResponseFormatter:
                 "render_method": result.render_method,
                 "paywall_detected": result.paywall_detected,
                 "warnings": result.warnings,
+                "explanation_source": getattr(
+                    result,
+                    "explanation_source",
+                    None,
+                ),
                 "processing_time": result._processing_time,
             },
         }

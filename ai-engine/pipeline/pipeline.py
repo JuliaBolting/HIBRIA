@@ -164,6 +164,7 @@ class PipelineResult:
 
     explanation: str | None = None
     details: list[str] = field(default_factory=list)
+    explanation_source: str | None = None
 
     # ── response_formatter ───────────────────────────────────────────────────
 
@@ -380,6 +381,7 @@ class PipelineResult:
             # saída
             "explanation": self.explanation,
             "details": self.details,
+            "explanation_source": self.explanation_source,
             "response": self.response,
             # processamento
             "processing_time": self._processing_time,
@@ -1021,6 +1023,7 @@ class HibriaPipeline:
         if report:
             result.explanation = report.get("explanation")
             result.details = list(report.get("details") or [])[:4]
+            result.explanation_source = "qwen"
             logger.info(
                 "[explanation_generator] explicação e detalhes gerados com sucesso"
             )
@@ -1028,6 +1031,7 @@ class HibriaPipeline:
             fallback = ExplanationGenerator.fallback_report(result)
             result.explanation = fallback["explanation"]
             result.details = fallback["details"]
+            result.explanation_source = "fallback"
             result.warnings.append(
                 "[explanation_generator] Qwen local indisponível — "
                 "usada explicação determinística de contingência"

@@ -16,7 +16,7 @@ from api.routes.analyze import router as analyze_router  # noqa: E402
 
 app = FastAPI(
     title="HIBRIA API",
-    version="1.2.0",
+    version="1.2.1",
     description="API de análise de desinformação do HIBRIA",
 )
 

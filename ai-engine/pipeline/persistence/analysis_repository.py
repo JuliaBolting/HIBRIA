@@ -49,7 +49,7 @@ class AnalysisRepository:
 
     @staticmethod
     def pipeline_version() -> str:
-        return os.getenv("HIBRIA_PIPELINE_VERSION", "1.2.0").strip() or "1.2.0"
+        return os.getenv("HIBRIA_PIPELINE_VERSION", "1.2.1").strip() or "1.2.1"
 
     @staticmethod
     def cache_ttl_hours() -> int:

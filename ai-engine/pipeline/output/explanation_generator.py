@@ -281,7 +281,6 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
         claims = getattr(result, "claims", None)
         stance_results = getattr(result, "stance_results", None)
         retrieval_results = getattr(result, "retrieval_results", None)
-        text_features = getattr(result, "text_features", None)
         title = getattr(result, "title", "") or ""
 
         claim_texts: list[str] = []
@@ -376,14 +375,6 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
                 if value is not None:
                     reputation_summary[key] = value
 
-        text_feature_summary: dict[str, Any] = {}
-        if isinstance(text_features, dict) and text_features.get("status") == "ok":
-            text_feature_summary = {
-                "label": text_features.get("label"),
-                "flags": list(text_features.get("flags") or [])[:5],
-                "nota": "sinal auxiliar de linguagem; não determina a veracidade",
-            }
-
         context = {
             "titulo": title[:300],
             "resultado_calculado": {
@@ -391,7 +382,6 @@ Não repita nos detalhes exatamente a mesma informação da explicação.
             },
             "componentes": safe_breakdown,
             "reputacao_fonte": reputation_summary,
-            "sinais_textuais_auxiliares": text_feature_summary,
             "claims_principais": claim_texts,
             "relacoes_claim_evidencia": stance_summary,
             "amostra_evidencias_recuperadas": evidence_summary,
