@@ -72,46 +72,12 @@ class ExplanationGenerator:
         "additionalProperties": False,
     }
 
-    @staticmethod
-    def fallback_report(result: Any) -> dict[str, Any]:
+    @classmethod
+    def fallback_report(cls, result: Any) -> dict[str, Any]:
         """Explicação determinística quando o serviço local não responde."""
-        label = str(getattr(result, "label_final", None) or "não verificado")
-        breakdown = getattr(result, "score_breakdown", None) or {}
-        coverage = breakdown.get("coverage_score")
-        stance = breakdown.get("stance_stats") or {}
-
-        try:
-            coverage_value = float(coverage)
-            if coverage_value > 1.0:
-                coverage_value /= 100.0
-            coverage_value = max(0.0, min(1.0, coverage_value))
-        except (TypeError, ValueError):
-            coverage_value = 0.0
-
-        if coverage_value >= 0.60:
-            coverage_text = "A maior parte das afirmações recebeu evidência suficiente."
-        elif coverage_value >= 0.30:
-            coverage_text = "Apenas parte das afirmações recebeu evidência suficiente."
-        else:
-            coverage_text = "Poucas afirmações receberam evidência suficiente."
-
-        contradictions = int(stance.get("contradict", 0) or 0)
-        supports = int(stance.get("support", 0) or 0)
-        relation_text = (
-            f"Foram identificados {supports} apoios e {contradictions} contradições nas comparações válidas."
-        )
-
-        reputation = getattr(result, "reputation", None) or {}
-        if reputation.get("status") == "evaluated":
-            reputation_text = "A reputação dinâmica da fonte também foi considerada."
-        else:
-            reputation_text = "A fonte ainda não tinha reputação dinâmica completa."
-
         return {
-            "explanation": (
-                f'O resultado foi "{label}". {coverage_text}'
-            )[:300],
-            "details": [coverage_text, relation_text[:160], reputation_text],
+            "explanation": cls._deterministic_explanation(result),
+            "details": cls._deterministic_details(result),
         }
 
     @classmethod
@@ -225,6 +191,13 @@ class ExplanationGenerator:
             # resumo das informações encontradas durante a busca.
             report["details"] = classification_details
 
+            # Modelos pequenos às vezes criam uma oposição inexistente, como
+            # "a informação foi encontrada, mas há apoio", ou devolvem termos
+            # internos que não ajudam uma pessoa leiga. Nesses casos, preserva
+            # o resultado da análise e usa uma explicação simples e estável.
+            if not cls._is_plain_explanation(report["explanation"]):
+                report["explanation"] = cls._deterministic_explanation(result)
+
             logger.info(
                 "[explanation_generator] relatório gerado com sucesso "
                 f"({len(report['explanation'])} caracteres, "
@@ -294,9 +267,9 @@ REGRAS OBRIGATÓRIAS:
 - Explique por que a classificação apresentada foi atribuída. O resultado
   pertence ao sistema; nenhuma fonte externa deve aparecer como autora do
   veredito.
-- Na resposta ao usuário, use voz impessoal: "a análise encontrou", "o
-  resultado indica" ou "as evidências consultadas mostram". Nunca escreva "a
-  HÍBRIA encontrou", "a HÍBRIA classificou" ou "a HÍBRIA atribuiu".
+- Na resposta ao usuário, use frases diretas como "a informação recebeu
+  confirmação", "foi possível verificar" e "o resultado foi". Nunca escreva
+  "a HÍBRIA encontrou", "a HÍBRIA classificou" ou "a HÍBRIA atribuiu".
 - O leitor não conhece as claims internas. Nunca escreva "claim", "primeira
   afirmação", "segunda afirmação" ou "terceira afirmação". Reescreva o fato
   específico em linguagem comum, por exemplo: "A escalação do ator recebeu
@@ -313,6 +286,12 @@ REGRAS OBRIGATÓRIAS:
 - Não escreva frases vagas como "a evidência é relevante" ou "há dados
   suficientes" sem dizer qual informação foi encontrada.
 - Escreva para uma pessoa comum, sem linguagem técnica.
+- Não use as palavras "cobertura", "comparações", "apoio externo" ou
+  "evidências externas" na resposta. Prefira "foi possível verificar",
+  "recebeu confirmação" e "não coincidiu com o que foi encontrado".
+- Não escreva construções contraditórias como "a informação foi encontrada,
+  mas há apoio". Confirmação não é oposição. Use "a informação recebeu
+  confirmação; porém, outras partes não puderam ser verificadas".
 - Não use Markdown.
 - Não explique seu raciocínio.
 - Responda em português do Brasil.
@@ -561,7 +540,7 @@ detalhes exatamente a mesma informação da explicação.
 
     @classmethod
     def _deterministic_details(cls, result: Any) -> list[str]:
-        """Explica os três fatores do resultado sem resumir fatos pesquisados."""
+        """Explica os três fatores do resultado em linguagem cotidiana."""
         breakdown = getattr(result, "score_breakdown", None) or {}
         stance = breakdown.get("stance_stats") or {}
         supports = int(stance.get("support", 0) or 0)
@@ -570,75 +549,148 @@ detalhes exatamente a mesma informação da explicação.
 
         if supports and contradictions:
             comparison_text = (
-                "As comparações apresentaram tanto apoio quanto divergências "
-                "em relação às evidências externas."
+                f"Nas verificações feitas, houve {supports} "
+                f"{cls._plural(supports, 'confirmação', 'confirmações')} e "
+                f"{contradictions} "
+                f"{cls._plural(contradictions, 'resultado que não coincidiu', 'resultados que não coincidiram')} "
+                "com a notícia."
             )
         elif contradictions:
             comparison_text = (
-                "Foram encontradas divergências entre as informações da notícia "
-                "e as evidências externas consultadas."
+                f"Nas verificações feitas, {contradictions} "
+                f"{cls._plural(contradictions, 'resultado não coincidiu', 'resultados não coincidiram')} "
+                "com a notícia."
             )
         elif supports:
             comparison_text = (
-                "As comparações encontraram apoio externo e não identificaram "
-                "divergências relevantes."
+                f"Nas verificações feitas, houve {supports} "
+                f"{cls._plural(supports, 'confirmação', 'confirmações')} e nenhuma "
+                "diferença importante."
             )
         elif neutral:
             comparison_text = (
-                "As evidências encontradas forneceram contexto, mas não uma "
-                "confirmação direta suficiente."
+                f"Nas verificações feitas, {neutral} "
+                f"{cls._plural(neutral, 'resultado ajudou', 'resultados ajudaram')} "
+                "a entender o assunto, mas "
+                f"{cls._plural(neutral, 'não confirmou', 'não confirmaram')} "
+                "diretamente a notícia."
             )
         else:
             comparison_text = (
-                "Não houve comparações conclusivas suficientes para confirmar "
-                "ou contradizer as informações analisadas."
+                "Não foi possível confirmar nem contestar as principais "
+                "informações da notícia."
             )
 
         coverage = cls._coverage_description(breakdown.get("coverage_score"))
         if coverage == "ampla":
             coverage_text = (
-                "A cobertura foi ampla, pois a maior parte das informações "
-                "verificáveis recebeu evidência suficiente."
+                "A maior parte das informações importantes da notícia pôde "
+                "ser verificada."
             )
         elif coverage == "parcial":
             coverage_text = (
-                "A cobertura foi parcial, pois apenas parte das informações "
-                "verificáveis recebeu confirmação suficiente."
+                "Apenas parte das informações importantes da notícia pôde "
+                "ser verificada."
             )
         elif coverage == "baixa":
             coverage_text = (
-                "A cobertura foi baixa, pois poucas informações verificáveis "
-                "receberam confirmação externa suficiente."
+                "Poucas informações importantes da notícia puderam ser "
+                "verificadas."
             )
         else:
             coverage_text = (
-                "A cobertura foi insuficiente, pois não houve confirmação externa "
-                "bastante para as informações verificáveis."
+                "Não houve informações suficientes para verificar os pontos "
+                "principais da notícia."
             )
 
         label = str(getattr(result, "label_final", None) or "").casefold()
         if label in {"evidência insuficiente", "não verificado"}:
             meaning_text = (
-                "A falta de confirmação para parte do conteúdo reduziu a "
-                "classificação, mas não significa, por si só, que a notícia seja falsa."
+                f'Por isso, a nota ficou mais baixa e o resultado foi "{label}". '
+                "Isso não significa que a notícia seja falsa."
             )
         elif label == "não confiável":
             meaning_text = (
-                "As divergências tiveram impacto decisivo na classificação; o "
-                "resultado deve ser considerado junto de outras fontes."
+                'As diferenças encontradas reduziram a nota e levaram ao resultado '
+                '"não confiável". É recomendável conferir o conteúdo em outras fontes.'
             )
         elif label == "confiável":
             meaning_text = (
-                "A boa cobertura e o predomínio de apoio elevaram a classificação, "
-                "sem representar uma garantia absoluta de veracidade."
+                'A quantidade de confirmações elevou a nota e levou ao resultado '
+                '"confiável". Isso não é uma garantia absoluta de que tudo esteja correto.'
             )
         else:
             meaning_text = (
-                "A combinação entre apoios e limitações de cobertura resultou em "
-                "uma classificação intermediária."
+                f'Como apenas parte do conteúdo pôde ser confirmada, o resultado '
+                f'foi "{label or "parcialmente confiável"}".'
             )
 
         return [comparison_text, coverage_text, meaning_text]
+
+    @staticmethod
+    def _plural(amount: int, singular: str, plural: str) -> str:
+        return singular if amount == 1 else plural
+
+    @classmethod
+    def _deterministic_explanation(cls, result: Any) -> str:
+        """Resume a decisão sem vocabulário técnico ou oposição falsa."""
+        breakdown = getattr(result, "score_breakdown", None) or {}
+        stance = breakdown.get("stance_stats") or {}
+        supports = int(stance.get("support", 0) or 0)
+        contradictions = int(stance.get("contradict", 0) or 0)
+        coverage = cls._coverage_description(breakdown.get("coverage_score"))
+        label = str(getattr(result, "label_final", None) or "não verificado")
+
+        if supports and contradictions:
+            finding = (
+                "Algumas informações foram confirmadas, mas outras não "
+                "coincidiram com o que foi encontrado"
+            )
+        elif contradictions:
+            finding = (
+                "Algumas informações não coincidiram com o que foi encontrado"
+            )
+        elif supports:
+            finding = "As informações verificadas receberam confirmação"
+        else:
+            finding = "Não foi possível confirmar diretamente as informações principais"
+
+        if coverage == "ampla":
+            reach = "a maior parte da notícia pôde ser verificada"
+        elif coverage == "parcial":
+            reach = "apenas parte da notícia pôde ser verificada"
+        elif coverage == "baixa":
+            reach = "poucas partes da notícia puderam ser verificadas"
+        else:
+            reach = "não houve informações suficientes para verificar a notícia"
+
+        explanation = f"{finding}. Como {reach}, o resultado foi \"{label}\"."
+        if label.casefold() in {"evidência insuficiente", "não verificado"}:
+            explanation += " Isso não significa que a notícia seja falsa."
+
+        return cls._limit_output_text(explanation, 300)
+
+    @staticmethod
+    def _is_plain_explanation(value: Any) -> bool:
+        """Rejeita contradições recorrentes e jargão pouco útil ao leitor."""
+        text = " ".join(str(value or "").casefold().split())
+        if not text:
+            return False
+
+        forbidden = (
+            "mas há apoio",
+            "porém há apoio",
+            "cobertura",
+            "comparações",
+            "apoio externo",
+            "evidências externas",
+            "claim",
+            "primeira afirmação",
+            "segunda afirmação",
+            "terceira afirmação",
+            "a análise encontrou que",
+        )
+        return not any(term in text for term in forbidden)
 
     @staticmethod
     def _truncate_text(value: Any, max_chars: int) -> str:
@@ -762,20 +814,20 @@ Escreva a explicação final da análise usando exclusivamente o contexto abaixo
 Retorne somente o objeto JSON solicitado pelo schema.
 
 A "explanation" deve ter no máximo 300 caracteres e explicar somente o principal
-motivo da classificação final. Se a informação principal tiver apoio, diga isso.
-Se a cobertura for baixa, atribua a falta de confirmação às demais informações
-verificáveis da notícia, sem tratar isso como falsidade.
+motivo da classificação final. Se a informação principal tiver confirmação,
+diga isso uma única vez. Depois explique, quando for o caso, que outras partes
+não puderam ser verificadas ou não coincidiram com o que foi encontrado.
 Use "fatores_que_formaram_o_resultado" para explicar a decisão global. Use as
 comparações somente para dar exemplos concretos.
 
-Os três itens de "details" devem explicar, nesta ordem, o resultado das
-comparações com evidências; como a cobertura afetou o resultado; e o que a
-classificação significa. Não conte fatos descobertos durante a pesquisa.
+Os três itens de "details" devem explicar, nesta ordem: o que foi confirmado ou
+não coincidiu; quanto da notícia pôde ser verificado; e como isso afetou a nota e
+a classificação. Não conte fatos descobertos durante a pesquisa.
 
 Não coloque números, hífens ou bolinhas no início dos detalhes. Não enumere
 informações como "primeira afirmação". Não copie nomes de campos nem
-justificativas técnicas. Cite no máximo uma referência externa e somente se ela
-for indispensável; prefira "evidências externas consultadas".
+justificativas técnicas. Não use "cobertura", "comparações", "apoio externo" ou
+"evidências externas". Não cite nomes de sites ou veículos.
 
 CONTEXTO:
 {context_json}
