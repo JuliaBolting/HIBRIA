@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Any
 
 import requests
@@ -47,17 +48,17 @@ class ExplanationGenerator:
         "properties": {
             "explanation": {
                 "type": "string",
-                "maxLength": 480,
+                "maxLength": 360,
                 "description": (
                     "Explicação objetiva do resultado em português do Brasil, "
-                    "com duas ou três frases completas."
+                    "com uma ou duas frases completas e no máximo 300 caracteres."
                 ),
             },
             "details": {
                 "type": "array",
                 "items": {
                     "type": "string",
-                    "maxLength": 260,
+                    "maxLength": 280,
                 },
                 "minItems": 3,
                 "maxItems": 3,
@@ -278,6 +279,9 @@ REGRAS OBRIGATÓRIAS:
 - Se um par indicar apoio externo, diga que aquela informação recebeu apoio.
   Não chame essa evidência isolada de insuficiente apenas porque a classificação
   global é "evidência insuficiente".
+- Quando a informação principal tiver apoio externo, nunca diga depois que ela
+  ficou sem confirmação. Nesse caso, a cobertura baixa se refere às demais
+  informações verificáveis da notícia.
 - Explique por que a HÍBRIA atribuiu a classificação apresentada. A HÍBRIA é
   responsável pelo resultado; nenhuma fonte externa deve aparecer como autora
   do veredito.
@@ -302,9 +306,11 @@ REGRAS OBRIGATÓRIAS:
 - Responda em português do Brasil.
 - Termine a explicação e cada detalhe com uma frase completa e pontuação final.
 - Nunca corte uma palavra nem termine com abreviação causada por corte de texto.
+- Não numere os detalhes e não coloque marcadores como "1.", "2.", "3." ou
+  hífens. A interface adicionará os marcadores automaticamente.
 
 A saída deve conter:
-- "explanation": duas ou três frases, com no máximo 480 caracteres.
+- "explanation": uma ou duas frases completas, com no máximo 300 caracteres.
 - "details": exatamente três frases concretas, cada uma com no máximo 260
   caracteres.
 
@@ -659,21 +665,22 @@ Escreva a explicação final da análise usando exclusivamente o contexto abaixo
 
 Retorne somente o objeto JSON solicitado pelo schema.
 
-A "explanation" deve explicar de forma simples o principal motivo da
-classificação final. Se a cobertura for baixa, diga que faltou confirmação para
-parte das informações verificáveis da notícia, sem tratar isso como falsidade.
+A "explanation" deve ter no máximo 300 caracteres e explicar somente o principal
+motivo da classificação final. Se a informação principal tiver apoio, diga isso.
+Se a cobertura for baixa, atribua a falta de confirmação às demais informações
+verificáveis da notícia, sem tratar isso como falsidade.
 Use "fatores_que_formaram_o_resultado" para explicar a decisão global da
 HÍBRIA. Use as comparações somente para dar exemplos concretos.
 
-Os três itens de "details" devem explicar, nesta ordem:
-1. o que a HÍBRIA encontrou sobre a informação principal, repetindo o fato;
-2. o que ficou confirmado, divergente ou sem confirmação nas demais informações;
-3. como a cobertura, as divergências e os fatores complementares afetaram a
-classificação.
+Os três itens de "details" devem explicar, nesta ordem, o que a HÍBRIA encontrou
+sobre a informação principal; o que ficou confirmado, divergente ou sem
+confirmação nas demais informações; e como a cobertura, as divergências e os
+fatores complementares afetaram a classificação.
 
-Não enumere informações como "primeira afirmação". Não copie nomes de campos
-nem justificativas técnicas. Cite no máximo uma referência externa e somente se
-ela for indispensável; prefira "evidências externas consultadas".
+Não coloque números, hífens ou bolinhas no início dos detalhes. Não enumere
+informações como "primeira afirmação". Não copie nomes de campos nem
+justificativas técnicas. Cite no máximo uma referência externa e somente se ela
+for indispensável; prefira "evidências externas consultadas".
 
 CONTEXTO:
 {context_json}
@@ -740,12 +747,12 @@ CONTEXTO:
         ):
             return None
 
-        explanation = str(
+        explanation = cls._normalize_model_text(
             parsed.get("explanation")
             or parsed.get("evidence")
             or parsed.get("evidencia")
             or ""
-        ).strip()
+        )
 
         raw_details = (
             parsed.get("details")
@@ -773,9 +780,12 @@ CONTEXTO:
         details: list[str] = []
 
         for item in raw_details:
-            text = str(
-                item or ""
-            ).strip()
+            text = cls._normalize_model_text(item)
+            text = re.sub(
+                r"^(?:\d{1,2}\s*[.)\-:]|[-•])\s*",
+                "",
+                text,
+            )
 
             if not text:
                 continue
@@ -792,9 +802,15 @@ CONTEXTO:
             return None
 
         return {
-            "explanation": cls._limit_output_text(explanation, 480),
+            "explanation": cls._limit_output_text(explanation, 300),
             "details": details,
         }
+
+    @staticmethod
+    def _normalize_model_text(value: Any) -> str:
+        """Normaliza espaços e pequenos erros recorrentes do modelo local."""
+        text = " ".join(str(value or "").split())
+        return re.sub(r"\bH[IÍ]BRA\b", "HÍBRIA", text, flags=re.IGNORECASE)
 
     @staticmethod
     def _env_int(
