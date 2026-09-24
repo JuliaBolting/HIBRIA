@@ -1179,6 +1179,36 @@ button:focus-visible {
 }
 
 
+:root:not([data-theme="dark"]) .new-analysis-button {
+  color: #586ff0;
+
+  background:
+    color-mix(
+      in srgb,
+      #586ff0 10%,
+      transparent
+    );
+
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      #586ff0 55%,
+      transparent
+    );
+}
+
+
+:root:not([data-theme="dark"]) .new-analysis-button:hover {
+  background:
+    color-mix(
+      in srgb,
+      #586ff0 16%,
+      transparent
+    );
+}
+
+
 .new-analysis-button img {
   display: block;
 
