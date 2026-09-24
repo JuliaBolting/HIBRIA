@@ -1,10 +1,13 @@
 -- =============================================================================
 -- Cache e histórico das análises da HÍBRIA
 --
--- Uma análise é reutilizada somente quando coincidirem:
+-- Uma análise recente é reutilizada quando coincidirem:
 --   - URL normalizada;
---   - conteúdo normalizado;
 --   - versão do pipeline.
+-- O hash do conteúdo permanece armazenado para histórico, auditoria e para
+-- distinguir versões da página após a expiração do cache. Ele não participa da
+-- consulta porque páginas jornalísticas possuem trechos dinâmicos que podem
+-- mudar entre duas capturas da mesma notícia.
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;

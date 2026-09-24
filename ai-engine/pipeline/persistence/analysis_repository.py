@@ -111,17 +111,31 @@ class AnalysisRepository:
 
         identity = self.cache_identity(url, content)
         query = """
-            UPDATE analises
+            WITH resultado_em_cache AS (
+                SELECT id
+                FROM analises
+                WHERE hash_url = %(url_hash)s
+                  AND versao_pipeline = %(pipeline_version)s
+                  AND (
+                        %(cache_ttl_hours)s = 0
+                        OR data_analise >= NOW() - (
+                            %(cache_ttl_hours)s * INTERVAL '1 hour'
+                        )
+                  )
+                ORDER BY data_analise DESC
+                LIMIT 1
+                FOR UPDATE
+            )
+            UPDATE analises AS analise
             SET ultima_consulta_em = NOW(),
-                quantidade_consultas = quantidade_consultas + 1
-            WHERE hash_url = %(url_hash)s
-              AND hash_conteudo = %(content_hash)s
-              AND versao_pipeline = %(pipeline_version)s
-              AND (
-                    %(cache_ttl_hours)s = 0
-                    OR data_analise >= NOW() - (%(cache_ttl_hours)s * INTERVAL '1 hour')
-              )
-            RETURNING id, resultado_json, data_analise, quantidade_consultas;
+                quantidade_consultas = analise.quantidade_consultas + 1
+            FROM resultado_em_cache
+            WHERE analise.id = resultado_em_cache.id
+            RETURNING
+                analise.id,
+                analise.resultado_json,
+                analise.data_analise,
+                analise.quantidade_consultas;
         """
 
         try:
@@ -134,7 +148,11 @@ class AnalysisRepository:
                 ) as cursor:
                     cursor.execute(
                         query,
-                        {**identity, "cache_ttl_hours": self.cache_ttl_hours()},
+                        {
+                            "url_hash": identity["url_hash"],
+                            "pipeline_version": identity["pipeline_version"],
+                            "cache_ttl_hours": self.cache_ttl_hours(),
+                        },
                     )
                     row = cursor.fetchone()
 

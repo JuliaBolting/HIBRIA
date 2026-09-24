@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS execucoes_avaliacao_reputacao (
 
 -- =============================================================================
 -- Cache e histórico das análises da HÍBRIA
+-- A reutilização considera a URL normalizada, a versão do pipeline e o prazo
+-- de validade. O hash do conteúdo é mantido para histórico e auditoria.
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS analises (
