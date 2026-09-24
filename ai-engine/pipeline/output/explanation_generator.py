@@ -174,10 +174,7 @@ class ExplanationGenerator:
             )
 
             classification_details = cls._deterministic_details(result)
-            report = cls._parse_report(
-                raw_content,
-                fallback_details=classification_details,
-            )
+            report = cls._parse_report(raw_content)
 
             if report is None:
                 logger.warning(
@@ -186,17 +183,25 @@ class ExplanationGenerator:
                 )
                 return None
 
-            # Os detalhes explicam somente os fatores da classificação. O Qwen
-            # redige a explicação curta, mas não transforma os tópicos em um
-            # resumo das informações encontradas durante a busca.
-            report["details"] = classification_details
+            used_deterministic_text = False
 
-            # Modelos pequenos às vezes criam uma oposição inexistente, como
-            # "a informação foi encontrada, mas há apoio", ou devolvem termos
-            # internos que não ajudam uma pessoa leiga. Nesses casos, preserva
-            # o resultado da análise e usa uma explicação simples e estável.
+            # Modelos pequenos às vezes criam uma oposição inexistente ou
+            # devolvem termos internos. A substituição é registrada como
+            # híbrida, para não identificar como Qwen um texto determinístico.
             if not cls._is_plain_explanation(report["explanation"]):
                 report["explanation"] = cls._deterministic_explanation(result)
+                used_deterministic_text = True
+
+            if not cls._are_plain_details(
+                report["details"],
+                explanation=report["explanation"],
+            ):
+                report["details"] = classification_details
+                used_deterministic_text = True
+
+            report["source"] = (
+                "hybrid" if used_deterministic_text else "qwen"
+            )
 
             logger.info(
                 "[explanation_generator] relatório gerado com sucesso "
@@ -236,80 +241,49 @@ class ExplanationGenerator:
         return """
 /no_think
 
-Você é o módulo de redação final da HÍBRIA.
+Você redige a explicação final de uma verificação de notícia.
+O resultado já foi calculado. Apenas explique por que ele ocorreu para uma
+pessoa sem conhecimento técnico.
 
-O resultado da análise já foi calculado pelo sistema.
-Sua única função é explicar esse resultado de maneira simples e curta.
+Use exclusivamente os dados recebidos. Não pesquise, não invente e não altere
+a classificação.
 
-REGRAS OBRIGATÓRIAS:
-- Não altere a classificação final.
-- Não recalcule o resultado.
-- Não pesquise e não utilize conhecimento externo.
-- Use somente os dados fornecidos.
-- Não invente fatos, fontes ou evidências.
-- Não apresente scores, pesos, percentuais ou valores internos.
-- Não mencione Qwen, BERTimbau, modelos, classificadores, pipeline, aggregator,
-  stance ou nomes de componentes internos.
-- Não mencione divergências entre classificadores internos.
-- Considere somente a classificação final como o resultado oficial.
-- A reputação da fonte é apenas um fator complementar.
-- Ausência de evidência não significa falsidade.
-- Evidência insuficiente não torna uma afirmação falsa ou inválida; significa
-  apenas que o sistema não encontrou confirmação externa bastante.
-- Só diga que há contradição quando as evidências fornecidas realmente
-  indicarem contradição.
-- Se um par indicar apoio externo, diga que aquela informação recebeu apoio.
-  Não chame essa evidência isolada de insuficiente apenas porque a classificação
-  global é "evidência insuficiente".
-- Quando a informação principal tiver apoio externo, nunca diga depois que ela
-  ficou sem confirmação. Nesse caso, a cobertura baixa se refere às demais
-  informações verificáveis da notícia.
-- Explique por que a classificação apresentada foi atribuída. O resultado
-  pertence ao sistema; nenhuma fonte externa deve aparecer como autora do
-  veredito.
-- Na resposta ao usuário, use frases diretas como "a informação recebeu
-  confirmação", "foi possível verificar" e "o resultado foi". Nunca escreva
-  "a HÍBRIA encontrou", "a HÍBRIA classificou" ou "a HÍBRIA atribuiu".
-- O leitor não conhece as claims internas. Nunca escreva "claim", "primeira
-  afirmação", "segunda afirmação" ou "terceira afirmação". Reescreva o fato
-  específico em linguagem comum, por exemplo: "A escalação do ator recebeu
-  confirmação externa".
-- Explique primeiro o que foi encontrado sobre a informação principal da
-  notícia, depois o que ficou sem confirmação e como isso afetou o resultado.
-- Normalmente não cite nomes de sites ou veículos. Quando for realmente
-  necessário para compreender um fato concreto, cite no máximo uma referência
-  em toda a resposta e trate-a apenas como material consultado.
-- Não diga que uma fonte provou que a notícia é verdadeira ou falsa. Em caso de
-  divergência, diga que a análise encontrou informações divergentes.
-- Não use as expressões "polaridade", "sobreposição", "similaridade",
-  "base de dados", "componentes" ou "a conclusão não é válida".
-- Não escreva frases vagas como "a evidência é relevante" ou "há dados
-  suficientes" sem dizer qual informação foi encontrada.
-- Escreva para uma pessoa comum, sem linguagem técnica.
-- Não use as palavras "cobertura", "comparações", "apoio externo" ou
-  "evidências externas" na resposta. Prefira "foi possível verificar",
-  "recebeu confirmação" e "não coincidiu com o que foi encontrado".
-- Não escreva construções contraditórias como "a informação foi encontrada,
-  mas há apoio". Confirmação não é oposição. Use "a informação recebeu
-  confirmação; porém, outras partes não puderam ser verificadas".
-- Não use Markdown.
-- Não explique seu raciocínio.
-- Responda em português do Brasil.
-- Termine a explicação e cada detalhe com uma frase completa e pontuação final.
-- Nunca corte uma palavra nem termine com abreviação causada por corte de texto.
-- Não numere os detalhes e não coloque marcadores como "1.", "2.", "3." ou
-  hífens. A interface adicionará os marcadores automaticamente.
-- Os detalhes devem explicar somente os motivos da classificação. Não use os
-  detalhes para contar assuntos, pessoas, datas ou curiosidades descobertas
-  durante a pesquisa.
+Escreva assim:
+- Comece pelo assunto concreto da notícia, usando o título e as informações
+  verificáveis para o leitor reconhecer o que foi analisado.
+- Diga com clareza o que recebeu confirmação, o que apresentou diferença ou o
+  que não pôde ser verificado.
+- Explique como o conjunto dessas verificações levou à classificação final.
+- Quando houver confirmações e pouca abrangência, deixe claro que algumas
+  partes foram confirmadas, mas poucas partes do conteúdo completo puderam ser
+  verificadas. Isso não é contradição.
 
-A saída deve conter:
-- "explanation": uma ou duas frases completas, com no máximo 300 caracteres.
-- "details": exatamente três frases concretas, cada uma com no máximo 260
-  caracteres.
+Regras:
+- Use português do Brasil, frases simples e completas.
+- Não escreva “a HÍBRIA encontrou”, “a HÍBRIA classificou” ou “a HÍBRIA
+  atribuiu”. Prefira construções impessoais como “foi possível verificar”.
+- Não use termos internos: claim, primeira afirmação, segunda afirmação,
+  pipeline, modelo, classificador, BERTimbau, stance, score, peso, polaridade,
+  similaridade, cobertura, sobreposição ou base de dados.
+- Não transforme falta de confirmação em falsidade. “Evidência insuficiente”
+  significa que não foi possível verificar uma parte suficiente do conteúdo.
+- Não atribua o veredito a um site. Evite nomes de veículos e fontes.
+- Não apresente percentuais ou notas internas. Contagens de confirmações e
+  divergências podem ser usadas nos detalhes quando ajudarem a explicar.
+- Não conte curiosidades descobertas na pesquisa. Fale somente dos motivos da
+  classificação.
+- Não repita a mesma frase na explicação e nos detalhes.
+- Não use Markdown, listas numeradas ou marcadores no texto dos detalhes.
+- Termine todas as frases com pontuação.
 
-Cada detalhe deve abordar uma informação ou um fator diferente. Não repita nos
-detalhes exatamente a mesma informação da explicação.
+Retorne somente o JSON do schema:
+- “explanation”: uma ou duas frases, no máximo 300 caracteres.
+- “details”: exatamente três frases diferentes, no máximo 260 caracteres cada.
+
+Os detalhes devem cumprir funções diferentes:
+1. explicar o equilíbrio entre confirmações, diferenças e ausências;
+2. explicar quanto do conteúdo importante pôde ser verificado;
+3. explicar por que isso resultou na classificação final.
 """.strip()
 
     @classmethod
@@ -340,18 +314,18 @@ detalhes exatamente a mesma informação da explicação.
         )
 
         result_factors: dict[str, str] = {
-            "cobertura_das_informacoes": coverage_description,
+            "quanto_do_conteudo_foi_verificado": coverage_description,
         }
         if isinstance(breakdown, dict):
             result_factors.update(
                 {
-                    "forca_da_confirmacao_externa": cls._score_description(
+                    "forca_das_confirmacoes": cls._score_description(
                         breakdown.get("evidence_score")
                     ),
-                    "resultado_das_comparacoes": cls._stance_description(
+                    "resumo_das_verificacoes": cls._stance_description(
                         breakdown.get("stance_stats")
                     ),
-                    "sinal_auxiliar_da_analise_textual": (
+                    "sinal_complementar_do_texto": (
                         cls._text_signal_description(
                             breakdown.get("bertimbau_score")
                         )
@@ -380,7 +354,7 @@ detalhes exatamente a mesma informação da explicação.
             "fatores_que_formaram_o_resultado": result_factors,
             "reputacao_fonte": reputation_summary,
             "informacoes_verificaveis": claim_texts,
-            "comparacoes_com_evidencias": evidence_pairs,
+            "verificacoes_realizadas": evidence_pairs,
         }
 
         prompt = cls._render_prompt(context)
@@ -388,13 +362,13 @@ detalhes exatamente a mesma informação da explicação.
         # Evita cortar JSON no meio.
         # Se ficar grande, reduz progressivamente as amostras.
         if len(prompt) > cls.MAX_INPUT_CHARS:
-            context["comparacoes_com_evidencias"] = evidence_pairs[:2]
+            context["verificacoes_realizadas"] = evidence_pairs[:2]
             context["informacoes_verificaveis"] = claim_texts[:3]
 
             prompt = cls._render_prompt(context)
 
         if len(prompt) > cls.MAX_INPUT_CHARS:
-            for pair in context["comparacoes_com_evidencias"]:
+            for pair in context["verificacoes_realizadas"]:
                 pair["conteudo_consultado"] = cls._truncate_text(
                     pair.get("conteudo_consultado"),
                     180,
@@ -407,7 +381,7 @@ detalhes exatamente a mesma informação da explicação.
             prompt = cls._render_prompt(context)
 
         if len(prompt) > cls.MAX_INPUT_CHARS:
-            context["comparacoes_com_evidencias"] = evidence_pairs[:1]
+            context["verificacoes_realizadas"] = evidence_pairs[:1]
             context["informacoes_verificaveis"] = claim_texts[:2]
 
             context["reputacao_fonte"] = {
@@ -505,7 +479,7 @@ detalhes exatamente a mesma informação da explicação.
                         getattr(evidence, "title", ""),
                         180,
                     ),
-                    "resultado_encontrado_pela_hibria": cls.RELATION_LABELS.get(
+                    "resultado_da_verificacao": cls.RELATION_LABELS.get(
                         relation,
                         "relação não determinada",
                     ),
@@ -549,31 +523,29 @@ detalhes exatamente a mesma informação da explicação.
 
         if supports and contradictions:
             comparison_text = (
-                f"Nas verificações feitas, houve {supports} "
-                f"{cls._plural(supports, 'confirmação', 'confirmações')} e "
+                f"Entre os trechos verificados, {supports} "
+                f"{cls._plural(supports, 'recebeu', 'receberam')} confirmação e "
                 f"{contradictions} "
-                f"{cls._plural(contradictions, 'resultado que não coincidiu', 'resultados que não coincidiram')} "
-                "com a notícia."
+                f"{cls._plural(contradictions, 'apresentou', 'apresentaram')} "
+                "informações diferentes das referências consultadas."
             )
         elif contradictions:
             comparison_text = (
-                f"Nas verificações feitas, {contradictions} "
-                f"{cls._plural(contradictions, 'resultado não coincidiu', 'resultados não coincidiram')} "
-                "com a notícia."
+                f"Entre os trechos verificados, {contradictions} "
+                f"{cls._plural(contradictions, 'apresentou', 'apresentaram')} "
+                "informações diferentes das referências consultadas."
             )
         elif supports:
             comparison_text = (
-                f"Nas verificações feitas, houve {supports} "
-                f"{cls._plural(supports, 'confirmação', 'confirmações')} e nenhuma "
-                "diferença importante."
+                f"Entre os trechos verificados, {supports} "
+                f"{cls._plural(supports, 'recebeu', 'receberam')} confirmação, "
+                "sem diferenças importantes nas referências consultadas."
             )
         elif neutral:
             comparison_text = (
-                f"Nas verificações feitas, {neutral} "
-                f"{cls._plural(neutral, 'resultado ajudou', 'resultados ajudaram')} "
-                "a entender o assunto, mas "
-                f"{cls._plural(neutral, 'não confirmou', 'não confirmaram')} "
-                "diretamente a notícia."
+                f"Foram encontrados {neutral} "
+                f"{cls._plural(neutral, 'texto relacionado', 'textos relacionados')} "
+                "ao assunto, sem confirmação direta das informações principais."
             )
         else:
             comparison_text = (
@@ -584,18 +556,18 @@ detalhes exatamente a mesma informação da explicação.
         coverage = cls._coverage_description(breakdown.get("coverage_score"))
         if coverage == "ampla":
             coverage_text = (
-                "A maior parte das informações importantes da notícia pôde "
-                "ser verificada."
+                "Foi possível verificar a maior parte das informações "
+                "importantes da notícia."
             )
         elif coverage == "parcial":
             coverage_text = (
-                "Apenas parte das informações importantes da notícia pôde "
-                "ser verificada."
+                "Foi possível verificar apenas parte das informações "
+                "importantes da notícia."
             )
         elif coverage == "baixa":
             coverage_text = (
-                "Poucas informações importantes da notícia puderam ser "
-                "verificadas."
+                "Apesar das verificações realizadas, apenas uma pequena parte "
+                "das informações importantes pôde ser confirmada."
             )
         else:
             coverage_text = (
@@ -606,8 +578,9 @@ detalhes exatamente a mesma informação da explicação.
         label = str(getattr(result, "label_final", None) or "").casefold()
         if label in {"evidência insuficiente", "não verificado"}:
             meaning_text = (
-                f'Por isso, a nota ficou mais baixa e o resultado foi "{label}". '
-                "Isso não significa que a notícia seja falsa."
+                "A falta de confirmação para o restante do conteúdo reduziu a "
+                f'nota e levou ao resultado "{label}"; isso não indica, por si '
+                "só, que a notícia seja falsa."
             )
         elif label == "não confiável":
             meaning_text = (
@@ -641,19 +614,25 @@ detalhes exatamente a mesma informação da explicação.
         coverage = cls._coverage_description(breakdown.get("coverage_score"))
         label = str(getattr(result, "label_final", None) or "não verificado")
 
+        title = cls._truncate_text(
+            getattr(result, "title", "") or "",
+            105,
+        ).rstrip("…")
+        prefix = f'Na notícia “{title}”, ' if title else "Na notícia, "
+
         if supports and contradictions:
             finding = (
-                "Algumas informações foram confirmadas, mas outras não "
+                "algumas informações foram confirmadas, enquanto outras não "
                 "coincidiram com o que foi encontrado"
             )
         elif contradictions:
             finding = (
-                "Algumas informações não coincidiram com o que foi encontrado"
+                "algumas informações não coincidiram com o que foi encontrado"
             )
         elif supports:
-            finding = "As informações verificadas receberam confirmação"
+            finding = "as informações verificadas receberam confirmação"
         else:
-            finding = "Não foi possível confirmar diretamente as informações principais"
+            finding = "não foi possível confirmar diretamente as informações principais"
 
         if coverage == "ampla":
             reach = "a maior parte da notícia pôde ser verificada"
@@ -664,7 +643,9 @@ detalhes exatamente a mesma informação da explicação.
         else:
             reach = "não houve informações suficientes para verificar a notícia"
 
-        explanation = f"{finding}. Como {reach}, o resultado foi \"{label}\"."
+        explanation = (
+            f"{prefix}{finding}. Como {reach}, o resultado foi \"{label}\"."
+        )
         if label.casefold() in {"evidência insuficiente", "não verificado"}:
             explanation += " Isso não significa que a notícia seja falsa."
 
@@ -691,6 +672,55 @@ detalhes exatamente a mesma informação da explicação.
             "a análise encontrou que",
         )
         return not any(term in text for term in forbidden)
+
+    @classmethod
+    def _are_plain_details(
+        cls,
+        details: Any,
+        *,
+        explanation: str,
+    ) -> bool:
+        """Aceita somente três tópicos legíveis, distintos e não repetitivos."""
+        if not isinstance(details, list) or len(details) != 3:
+            return False
+
+        normalized = [" ".join(str(item or "").split()) for item in details]
+        if any(not cls._is_plain_explanation(item) for item in normalized):
+            return False
+        if len({item.casefold() for item in normalized}) != 3:
+            return False
+
+        for index, item in enumerate(normalized):
+            if cls._text_overlap(item, explanation) >= 0.86:
+                return False
+            for other in normalized[index + 1 :]:
+                if cls._text_overlap(item, other) >= 0.72:
+                    return False
+
+        return True
+
+    @staticmethod
+    def _text_overlap(first: str, second: str) -> float:
+        """Mede repetição lexical ignorando conectivos comuns."""
+        ignored = {
+            "a", "as", "o", "os", "um", "uma", "de", "da", "das", "do",
+            "dos", "e", "em", "na", "nas", "no", "nos", "para", "por",
+            "que", "com", "como", "foi", "foram", "isso", "esta", "este",
+        }
+
+        def tokens(value: str) -> set[str]:
+            return {
+                token
+                for token in re.findall(r"[a-záàâãéêíóôõúç]+", value.casefold())
+                if len(token) >= 3 and token not in ignored
+            }
+
+        first_tokens = tokens(first)
+        second_tokens = tokens(second)
+        smaller = min(len(first_tokens), len(second_tokens))
+        if smaller == 0:
+            return 0.0
+        return len(first_tokens & second_tokens) / smaller
 
     @staticmethod
     def _truncate_text(value: Any, max_chars: int) -> str:
@@ -809,25 +839,15 @@ detalhes exatamente a mesma informação da explicação.
         return f"""
 /no_think
 
-Escreva a explicação final da análise usando exclusivamente o contexto abaixo.
+Explique o resultado abaixo para uma pessoa comum.
 
-Retorne somente o objeto JSON solicitado pelo schema.
+Na explicação, identifique o assunto concreto da notícia e resuma por que a
+classificação foi atribuída. Nos detalhes, apresente três motivos diferentes:
+o resultado das verificações, quanto do conteúdo pôde ser verificado e como
+isso afetou a classificação.
 
-A "explanation" deve ter no máximo 300 caracteres e explicar somente o principal
-motivo da classificação final. Se a informação principal tiver confirmação,
-diga isso uma única vez. Depois explique, quando for o caso, que outras partes
-não puderam ser verificadas ou não coincidiram com o que foi encontrado.
-Use "fatores_que_formaram_o_resultado" para explicar a decisão global. Use as
-comparações somente para dar exemplos concretos.
-
-Os três itens de "details" devem explicar, nesta ordem: o que foi confirmado ou
-não coincidiu; quanto da notícia pôde ser verificado; e como isso afetou a nota e
-a classificação. Não conte fatos descobertos durante a pesquisa.
-
-Não coloque números, hífens ou bolinhas no início dos detalhes. Não enumere
-informações como "primeira afirmação". Não copie nomes de campos nem
-justificativas técnicas. Não use "cobertura", "comparações", "apoio externo" ou
-"evidências externas". Não cite nomes de sites ou veículos.
+Não copie os nomes dos campos. Não use marcadores, numeração, nomes de sites
+ou linguagem técnica. Retorne somente o objeto JSON solicitado.
 
 CONTEXTO:
 {context_json}

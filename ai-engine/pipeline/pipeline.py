@@ -1024,9 +1024,10 @@ class HibriaPipeline:
         if report:
             result.explanation = report.get("explanation")
             result.details = list(report.get("details") or [])[:4]
-            result.explanation_source = "qwen"
+            result.explanation_source = report.get("source") or "qwen"
             logger.info(
-                "[explanation_generator] explicação e detalhes gerados com sucesso"
+                "[explanation_generator] explicação e detalhes gerados com sucesso "
+                f"(origem={result.explanation_source})"
             )
         else:
             fallback = ExplanationGenerator.fallback_report(result)

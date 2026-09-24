@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from pipeline.analysis.stance_model import StanceModel
 from pipeline.output.aggregator import Aggregator
@@ -187,10 +187,10 @@ class StanceRegressionTests(unittest.TestCase):
 
         prompt = ExplanationGenerator._build_prompt(result)
 
-        self.assertIn("comparacoes_com_evidencias", prompt)
+        self.assertIn("verificacoes_realizadas", prompt)
         self.assertIn("fonte.test", prompt)
         self.assertIn("informacao_da_noticia", prompt)
-        self.assertIn("resultado_encontrado_pela_hibria", prompt)
+        self.assertIn("resultado_da_verificacao", prompt)
         self.assertIn("fatores_que_formaram_o_resultado", prompt)
         self.assertIn("foram encontrados apoios", prompt)
         self.assertNotIn("diferença relevante de polaridade textual", prompt)
@@ -198,9 +198,9 @@ class StanceRegressionTests(unittest.TestCase):
     def test_system_prompt_explains_result_without_numbered_claims(self):
         prompt = ExplanationGenerator._system_prompt()
 
-        self.assertIn("pertence ao sistema", prompt)
-        self.assertIn("cite no máximo uma referência", prompt)
-        self.assertIn('Nunca escreva "claim"', prompt)
+        self.assertIn("pessoa sem conhecimento técnico", prompt)
+        self.assertIn("Evite nomes de veículos", prompt)
+        self.assertIn("Não use termos internos: claim", prompt)
 
     def test_prompt_excerpt_does_not_end_in_middle_of_word(self):
         excerpt = (
@@ -326,10 +326,10 @@ class StanceRegressionTests(unittest.TestCase):
         details = ExplanationGenerator._deterministic_details(result)
 
         self.assertEqual(len(details), 3)
-        self.assertIn("2 confirmações", details[0])
-        self.assertIn("nenhuma diferença importante", details[0])
-        self.assertIn("Poucas informações importantes", details[1])
-        self.assertIn('resultado foi "evidência insuficiente"', details[2])
+        self.assertIn("2 receberam confirmação", details[0])
+        self.assertIn("sem diferenças importantes", details[0])
+        self.assertIn("apenas uma pequena parte", details[1])
+        self.assertIn('resultado "evidência insuficiente"', details[2])
         self.assertTrue(all("HÍBRIA" not in item for item in details))
         self.assertTrue(all("cobertura" not in item.casefold() for item in details))
         self.assertTrue(all("comparações" not in item.casefold() for item in details))
@@ -371,11 +371,58 @@ class StanceRegressionTests(unittest.TestCase):
 
         explanation = ExplanationGenerator._deterministic_explanation(result)
 
-        self.assertIn("Algumas informações foram confirmadas", explanation)
+        self.assertIn("algumas informações foram confirmadas", explanation)
         self.assertIn("poucas partes da notícia", explanation)
         self.assertIn('resultado foi "evidência insuficiente"', explanation)
         self.assertIn("não significa que a notícia seja falsa", explanation)
         self.assertNotIn("cobertura", explanation.casefold())
+
+    def test_generate_preserves_valid_qwen_details(self):
+        model_report = {
+            "explanation": (
+                "Os dados da pesquisa receberam algumas confirmações, enquanto "
+                "outras informações não puderam ser verificadas."
+            ),
+            "details": [
+                "Oito trechos receberam confirmação e três apresentaram informações diferentes.",
+                "Apenas uma pequena parte dos dados importantes pôde ser verificada.",
+                "A falta de verificação do restante reduziu a nota e levou ao resultado evidência insuficiente.",
+            ],
+        }
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "message": {
+                "content": json.dumps(model_report, ensure_ascii=False),
+            }
+        }
+        result = SimpleNamespace(
+            label_final="evidência insuficiente",
+            title="Quaest: disputa presidencial nos estados",
+            score_breakdown={
+                "coverage_score": 10.0,
+                "evidence_score": 56.0,
+                "bertimbau_score": 90.0,
+                "stance_stats": {
+                    "support": 8,
+                    "contradict": 3,
+                    "neutral": 2,
+                },
+            },
+            reputation={},
+            claims=[],
+            stance_results=[],
+            retrieval_results=[],
+        )
+
+        with patch(
+            "pipeline.output.explanation_generator.requests.post",
+            return_value=response,
+        ):
+            report = ExplanationGenerator.generate(result)
+
+        self.assertIsNotNone(report)
+        self.assertEqual(report["details"], model_report["details"])
+        self.assertEqual(report["source"], "qwen")
 
 
 if __name__ == "__main__":
