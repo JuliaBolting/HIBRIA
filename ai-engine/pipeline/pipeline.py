@@ -33,6 +33,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
+from typing import Callable
 
 from pipeline.analysis.stance_model import StanceModel
 
@@ -1071,6 +1072,7 @@ class HibriaPipeline:
         url: str,
         title: str = "",
         content: str = "",
+        progress_callback: Callable[[str], None] | None = None,
     ) -> PipelineResult:
         """
         Executa o pipeline completo.
@@ -1219,6 +1221,13 @@ class HibriaPipeline:
         for name, step in all_steps:
 
             step_start = time.time()
+
+            # Usado pela API assíncrona para que a extensão consiga recuperar
+            # a etapa atual mesmo depois que o popup for fechado. A callback é
+            # executada fora do bloco de tolerância a falhas: cancelamentos e
+            # erros de controle não devem ser convertidos em simples avisos.
+            if progress_callback is not None:
+                progress_callback(name)
 
             if show_progress:
 

@@ -12,11 +12,12 @@ from fastapi.responses import JSONResponse
 load_dotenv()
 
 from api.routes.analyze import router as analyze_router  # noqa: E402
+from api.routes.feedback import router as feedback_router  # noqa: E402
 
 
 app = FastAPI(
     title="HIBRIA API",
-    version="1.2.1",
+    version="1.3.0",
     description="API de análise de desinformação do HIBRIA",
 )
 
@@ -64,7 +65,10 @@ def _within_public_rate_limit(client: str) -> bool:
 
 @app.middleware("http")
 async def proteger_api(request: Request, call_next):
-    if request.url.path.startswith("/analyze") and request.method != "OPTIONS":
+    path = request.url.path
+    protected_path = path.startswith("/analyze") or path.startswith("/feedback")
+
+    if protected_path and request.method != "OPTIONS":
 
         if not HIBRIA_API_KEY and not HIBRIA_PUBLIC_API:
             return JSONResponse(
@@ -90,7 +94,15 @@ async def proteger_api(request: Request, call_next):
                 },
             )
 
-        if not authenticated:
+        starts_analysis = (
+            request.method == "POST" and path == "/analyze"
+        ) or (
+            request.method == "PUT" and path.startswith("/analyze/jobs/")
+        )
+
+        # Consultas de andamento são frequentes e não consomem as APIs de
+        # busca. O limite público é aplicado apenas quando uma análise começa.
+        if not authenticated and starts_analysis:
             client = request.client.host if request.client else "unknown"
             if not _within_public_rate_limit(client):
                 return JSONResponse(
@@ -105,6 +117,7 @@ async def proteger_api(request: Request, call_next):
 
 
 app.include_router(analyze_router)
+app.include_router(feedback_router)
 
 
 @app.get("/")
