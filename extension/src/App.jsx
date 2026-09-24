@@ -1,11 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { captureCurrentPage } from "./services/pageCapture";
-import { analyzePage } from "./services/api";
+import {
+  cancelAnalysisJob,
+  getAnalysisJob,
+  startAnalysisJob,
+  submitAnalysisFeedback,
+} from "./services/api";
+import {
+  clearAnalysisState,
+  createJobId,
+  getOrCreateEvaluatorId,
+  loadAnalysisState,
+  loadSavedFeedback,
+  saveAnalysisState,
+  saveFeedback,
+} from "./services/analysisState";
 import "./App.css";
 
-/* =========================================================
-   ETAPAS DA ANÁLISE
-   ========================================================= */
 
 const STEPS = [
   {
@@ -34,155 +45,293 @@ const STEPS = [
   },
 ];
 
-/* =========================================================
-   APP
-   ========================================================= */
+
+const WAITING_MESSAGES = [
+  "Pegue uma xícara de café enquanto espera!",
+  "Esta extensão faz parte de um projeto de TCC.",
+  "Você pode fechar esta janela: a análise continuará.",
+  "Enquanto isso, você pode continuar navegando.",
+  "A análise consulta diferentes fontes.",
+  "Cada notícia pode levar um tempo diferente.",
+  "Estamos organizando as informações encontradas.",
+  "Depois, avalie o resultado. Sua opinião ajuda muito!",
+  "A avaliação é anônima e opcional.",
+  "Seu retorno ajuda a melhorar a HÍBRIA.",
+];
+
+
+const POLL_INTERVAL_MS = 1_800;
+
 
 function App() {
-  const [screen, setScreen] = useState("home");
+  const [screen, setScreen] = useState("restoring");
   const [currentStep, setCurrentStep] = useState(0);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
-  const abortControllerRef = useRef(null);
-
+  const [jobId, setJobId] = useState("");
+  const [requestPayload, setRequestPayload] = useState(null);
+  const [messageIndex, setMessageIndex] = useState(0);
   const [theme, setTheme] = useState(
     () => localStorage.getItem("hibria-theme") || "light"
   );
 
-  /* =======================================================
-     TEMA
-     ======================================================= */
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("hibria-theme", theme);
   }, [theme]);
 
-  useEffect(
-    () => () => abortControllerRef.current?.abort(),
-    []
-  );
+
+  useEffect(() => {
+    let active = true;
+
+    async function restore() {
+      const saved = await loadAnalysisState();
+      if (!active) return;
+
+      if (saved?.screen === "loading" && saved?.jobId) {
+        setJobId(saved.jobId);
+        setRequestPayload(saved.requestPayload || null);
+        setCurrentStep(clampStep(saved.currentStep));
+        setScreen("loading");
+        return;
+      }
+
+      if (saved?.screen === "result" && saved?.result) {
+        setJobId(saved.jobId || "");
+        setResult(saved.result);
+        setCurrentStep(3);
+        setScreen("result");
+        return;
+      }
+
+      setError(saved?.error || "");
+      setScreen("home");
+    }
+
+    restore();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+
+  useEffect(() => {
+    if (screen !== "loading") return undefined;
+
+    const interval = window.setInterval(() => {
+      setMessageIndex(
+        (current) => (current + 1) % WAITING_MESSAGES.length
+      );
+    }, 4_200);
+
+    return () => window.clearInterval(interval);
+  }, [screen, jobId]);
+
+
+  useEffect(() => {
+    if (screen !== "loading" || !jobId) return undefined;
+
+    let active = true;
+    let timer = null;
+    let consecutiveErrors = 0;
+    let lastPersistedStep = null;
+
+    function schedule(delay = POLL_INTERVAL_MS) {
+      if (active) timer = window.setTimeout(poll, delay);
+    }
+
+    async function persistLoading(step) {
+      if (step === lastPersistedStep) return;
+      lastPersistedStep = step;
+      await saveAnalysisState({
+        screen: "loading",
+        jobId,
+        currentStep: step,
+        requestPayload,
+        startedAt: Date.now(),
+      });
+    }
+
+    async function finishWithError(message) {
+      if (!active) return;
+      const friendly =
+        message || "Não foi possível concluir a análise da página.";
+      setError(friendly);
+      setResult(null);
+      setJobId("");
+      setRequestPayload(null);
+      setScreen("home");
+      await saveAnalysisState({ screen: "home", error: friendly });
+    }
+
+    async function poll() {
+      try {
+        const job = await getAnalysisJob(jobId);
+        if (!active) return;
+        consecutiveErrors = 0;
+
+        const step = clampStep(job.current_step);
+        setCurrentStep(step);
+
+        if (job.status === "completed") {
+          const data = job.data;
+          if (getScore(data) === null || !getResultLabel(data)) {
+            await finishWithError(
+              "O servidor devolveu uma análise incompleta. Tente novamente."
+            );
+            return;
+          }
+
+          const compact = compactResult(data);
+          setResult(compact);
+          setCurrentStep(3);
+          setRequestPayload(null);
+          setScreen("result");
+          await saveAnalysisState({
+            screen: "result",
+            jobId,
+            currentStep: 3,
+            result: compact,
+          });
+          return;
+        }
+
+        if (job.status === "failed") {
+          await finishWithError(job.error);
+          return;
+        }
+
+        if (job.status === "cancelled") {
+          await clearAnalysisState();
+          if (!active) return;
+          setScreen("home");
+          setJobId("");
+          setRequestPayload(null);
+          return;
+        }
+
+        await persistLoading(step);
+        schedule();
+      } catch (pollError) {
+        if (!active) return;
+
+        // Se o popup foi fechado antes da confirmação do PUT, repetir o mesmo
+        // UUID é seguro: o endpoint de criação é idempotente.
+        if (pollError?.status === 404 && requestPayload) {
+          try {
+            await startAnalysisJob({ jobId, payload: requestPayload });
+            consecutiveErrors = 0;
+            schedule(700);
+            return;
+          } catch {
+            // A tolerância abaixo evita falhar por uma oscilação curta de rede.
+          }
+        }
+
+        consecutiveErrors += 1;
+        if (consecutiveErrors >= 8) {
+          await finishWithError(
+            pollError?.message ||
+              "Não foi possível consultar o andamento da análise."
+          );
+          return;
+        }
+        schedule(2_500);
+      }
+    }
+
+    // Dá tempo para o service worker registrar o trabalho antes da primeira
+    // consulta e evita repetir o PUT de criação sem necessidade.
+    schedule(700);
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [screen, jobId, requestPayload]);
+
 
   function toggleTheme() {
-    setTheme((current) =>
-      current === "dark" ? "light" : "dark"
-    );
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
-  /* =======================================================
-     INICIAR ANÁLISE
-     ======================================================= */
 
   async function handleAnalyze() {
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     setError("");
     setResult(null);
     setCurrentStep(0);
-    setScreen("loading");
+    setMessageIndex(0);
 
     try {
-      /* -----------------------------------------------
-         1. CAPTURA DA PÁGINA
-         ----------------------------------------------- */
-
-      setCurrentStep(0);
-
       const page = await captureCurrentPage();
-
-      /* -----------------------------------------------
-         2. ENVIO PARA API
-         ----------------------------------------------- */
-
-      setCurrentStep(1);
-
-      const analysisPromise = analyzePage({
+      const newJobId = createJobId();
+      const payload = {
         url: page.url,
         title: page.title,
         content: page.content,
-        signal: controller.signal,
-      }).then(
-        (data) => ({ data, error: null }),
-        (requestError) => ({ data: null, error: requestError })
-      );
+      };
+      const state = {
+        screen: "loading",
+        jobId: newJobId,
+        currentStep: 0,
+        requestPayload: payload,
+        requestAccepted: false,
+        startedAt: Date.now(),
+      };
 
-      // Mantém as quatro etapas visíveis como na interface original,
-      // sem perder o cancelamento real da requisição.
-      await wait(400, controller.signal);
+      // O estado é salvo antes da chamada de rede. Assim o mesmo trabalho pode
+      // ser recuperado mesmo se a janela fechar imediatamente depois.
+      await saveAnalysisState(state);
+      setJobId(newJobId);
+      setRequestPayload(payload);
+      setScreen("loading");
 
-      /* -----------------------------------------------
-         3. CRUZAMENTO DE FONTES
-         ----------------------------------------------- */
-
-      setCurrentStep(2);
-
-      const outcome = await analysisPromise;
-
-      if (outcome.error) {
-        throw outcome.error;
+      if (globalThis.chrome?.runtime?.sendMessage) {
+        chrome.runtime
+          .sendMessage({
+            type: "START_ANALYSIS_JOB",
+            jobId: newJobId,
+            payload,
+          })
+          .catch(() => startAnalysisJob({ jobId: newJobId, payload }));
+      } else {
+        startAnalysisJob({ jobId: newJobId, payload }).catch(() => {});
       }
-
-      const data = outcome.data;
-
-      if (getScore(data) === null || !getResultLabel(data)) {
-        throw new Error(
-          "O servidor devolveu uma análise incompleta. Tente novamente."
-        );
-      }
-
-      await wait(400, controller.signal);
-
-      /* -----------------------------------------------
-         4. GERAÇÃO DO RELATÓRIO
-         ----------------------------------------------- */
-
-      setCurrentStep(3);
-
-      await wait(500, controller.signal);
-
-      /* -----------------------------------------------
-         5. RESULTADO
-         ----------------------------------------------- */
-
-      setResult(data);
-      setScreen("result");
-    } catch (err) {
-      if (err?.name === "AbortError") {
-        return;
-      }
-      console.error("Erro durante a análise:", err);
-
-      setError(
-        err?.message ||
-          "Não foi possível concluir a análise da página."
-      );
-
+    } catch (captureError) {
+      const message =
+        captureError?.message ||
+        "Não foi possível capturar o conteúdo da página.";
+      setError(message);
       setScreen("home");
-    } finally {
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
-      }
+      await saveAnalysisState({ screen: "home", error: message });
     }
   }
 
-  /* =======================================================
-     NOVA ANÁLISE
-     ======================================================= */
 
-  function handleNewAnalysis() {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
+  async function handleNewAnalysis() {
+    const activeJobId = jobId;
+    await clearAnalysisState();
     setScreen("home");
     setCurrentStep(0);
     setResult(null);
     setError("");
+    setJobId("");
+    setRequestPayload(null);
+
+    if (activeJobId && screen === "loading") {
+      if (globalThis.chrome?.runtime?.sendMessage) {
+        chrome.runtime
+          .sendMessage({
+            type: "CANCEL_ANALYSIS_JOB",
+            jobId: activeJobId,
+          })
+          .catch(() => cancelAnalysisJob(activeJobId));
+      } else {
+        cancelAnalysisJob(activeJobId).catch(() => {});
+      }
+    }
   }
 
-  /* =======================================================
-     RENDER
-     ======================================================= */
 
   return (
     <div
@@ -192,32 +341,20 @@ function App() {
         "--result-color": getResultColor(result),
       }}
     >
-      {/* ===================================================
-          CONTROLES SUPERIORES
-          =================================================== */}
-
       <div className="header-controls">
         <button
           className="theme-button"
           type="button"
           onClick={toggleTheme}
           aria-label={
-            theme === "dark"
-              ? "Ativar tema claro"
-              : "Ativar tema escuro"
+            theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"
           }
           title={
-            theme === "dark"
-              ? "Ativar tema claro"
-              : "Ativar tema escuro"
+            theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"
           }
         >
           <img
-            src={
-              theme === "dark"
-                ? "/sun.png"
-                : "/moon.png"
-            }
+            src={theme === "dark" ? "/sun.png" : "/moon.png"}
             alt=""
             className="theme-icon"
           />
@@ -227,28 +364,29 @@ function App() {
           className="close-button"
           type="button"
           onClick={() => window.close()}
-          aria-label="Fechar"
+          aria-label={
+            screen === "loading"
+              ? "Fechar a janela; a análise continuará"
+              : "Fechar"
+          }
           title="Fechar"
         >
           <img src="/fechar.png" alt="" />
         </button>
       </div>
 
-      {/* ===================================================
-          TELA INICIAL
-          =================================================== */}
+      {screen === "restoring" && (
+        <main className="screen screen-restoring" aria-live="polite">
+          <img src="/logo-hibria.png" alt="HÍBRIA" className="logo-compact" />
+          <p>Recuperando a última análise…</p>
+        </main>
+      )}
 
       {screen === "home" && (
         <main className="screen screen-home">
           <div className="brand">
-            <img
-              src="/logo-hibria.png"
-              alt="HÍBRIA"
-              className="logo"
-            />
-
+            <img src="/logo-hibria.png" alt="HÍBRIA" className="logo" />
             <h1>HÍBRIA</h1>
-
             <p>
               Análise inteligente de
               <br />
@@ -265,27 +403,19 @@ function App() {
           </button>
 
           {error && (
-            <div className="error-message">
+            <div className="error-message" role="alert">
               {error}
             </div>
           )}
         </main>
       )}
 
-      {/* ===================================================
-          TELA DE LOADING
-          =================================================== */}
-
       {screen === "loading" && (
         <main className="screen screen-loading">
-          <img
-            src="/logo-hibria.png"
-            alt="HÍBRIA"
-            className="logo-compact"
-          />
+          <img src="/logo-hibria.png" alt="HÍBRIA" className="logo-compact" />
 
           <div className="loading-content">
-            <div className="thinking-dots">
+            <div className="thinking-dots" aria-hidden="true">
               <i />
               <i />
               <i />
@@ -293,152 +423,86 @@ function App() {
             </div>
 
             <h1>ANALISANDO...</h1>
-
-            <p className="loading-status">
+            <p className="loading-status" aria-live="polite">
               {STEPS[currentStep]?.label}
+            </p>
+            <p key={messageIndex} className="waiting-message">
+              {WAITING_MESSAGES[messageIndex]}
             </p>
           </div>
 
-          <ul className="steps">
+          <ol className="steps" aria-label="Etapas da análise">
             {STEPS.map((step, index) => {
               const isActive = index === currentStep;
               const isDone = index < currentStep;
-
               return (
                 <li
                   key={step.id}
-                  className={
-                    isActive
-                      ? "active"
-                      : isDone
-                      ? "done"
-                      : ""
-                  }
-                  style={{
-                    "--step-color": step.color,
-                  }}
+                  className={isActive ? "active" : isDone ? "done" : ""}
+                  style={{ "--step-color": step.color }}
+                  aria-current={isActive ? "step" : undefined}
                 >
                   <span className="step-icon">
-                    {isDone ? (
-                      <img
-                        src="/circle-check-big.png"
-                        alt=""
-                      />
-                    ) : (
-                      <img
-                        src={step.icon}
-                        alt=""
-                      />
-                    )}
+                    <img
+                      src={isDone ? "/circle-check-big.png" : step.icon}
+                      alt=""
+                    />
                   </span>
-
-                  <span className="step-label">
-                    {step.label}
-                  </span>
+                  <span className="step-label">{step.label}</span>
                 </li>
               );
             })}
-          </ul>
+          </ol>
 
           <button
             className="stop-button"
             type="button"
             onClick={handleNewAnalysis}
           >
-            <img
-              src="/circle-stop.png"
-              alt=""
-              className="stop-icon"
-            />
-
+            <img src="/circle-stop.png" alt="" className="stop-icon" />
             <span>Parar Análise</span>
           </button>
         </main>
       )}
 
-      {/* ===================================================
-          TELA DE RESULTADO
-          =================================================== */}
-
       {screen === "result" && (
         <main className="screen screen-result">
-          <img
-            src="/logo-hibria.png"
-            alt="HÍBRIA"
-            className="logo-compact"
-          />
-
+          <img src="/logo-hibria.png" alt="HÍBRIA" className="logo-compact" />
           <ScoreRing result={result} />
 
           <div className="verdict">
-            <img
-              src={getVerdictIcon(result)}
-              alt=""
-            />
-
-            <span>
-              {getVerdict(result)}
-            </span>
+            <img src={getVerdictIcon(result)} alt="" />
+            <span>{getVerdict(result)}</span>
           </div>
 
-          {/* -----------------------------------------------
-              EVIDÊNCIAS
-              ----------------------------------------------- */}
-
           <section className="result-card">
             <h2>
-              <img
-                src={getEvidenceIcon(result)}
-                alt=""
-              />
-
+              <img src={getEvidenceIcon(result)} alt="" />
               <span>Evidências</span>
             </h2>
-
-            <p>
-              {getExplanation(result)}
-            </p>
+            <p>{getExplanation(result)}</p>
           </section>
-
-          {/* -----------------------------------------------
-              DETALHES
-              ----------------------------------------------- */}
 
           <section className="result-card">
             <h2>
-              <img
-                src={getDetailsIcon(result)}
-                alt=""
-              />
-
+              <img src={getDetailsIcon(result)} alt="" />
               <span>Detalhes</span>
             </h2>
-
             <ul>
-              {getFactors(result).map(
-                (factor, index) => (
-                  <li key={index}>
-                    {factor}
-                  </li>
-                )
-              )}
+              {getFactors(result).map((factor, index) => (
+                <li key={index}>{factor}</li>
+              ))}
             </ul>
           </section>
 
-          {/* -----------------------------------------------
-              NOVA ANÁLISE
-              ----------------------------------------------- */}
+          <FeedbackCard key={getAnalysisId(result)} result={result} />
 
           <button
             className="new-analysis-button"
             type="button"
             onClick={handleNewAnalysis}
           >
-            <img
-              src="/rotate-ccw.png"
-              alt=""
-            />
-
+            <img src="/rotate-ccw.png" alt="" />
             <span>Nova Análise</span>
           </button>
         </main>
@@ -447,36 +511,150 @@ function App() {
   );
 }
 
-/* =========================================================
-   SCORE
-   ========================================================= */
+
+function FeedbackCard({ result }) {
+  const analysisId = getAnalysisId(result);
+  const [rating, setRating] = useState(null);
+  const [hovered, setHovered] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    loadSavedFeedback(analysisId).then((saved) => {
+      if (active && saved) setRating(Number(saved));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [analysisId]);
+
+  async function chooseRating(value) {
+    if (!analysisId || rating || submitting) return;
+    setSubmitting(true);
+    setFeedbackError("");
+
+    try {
+      const evaluatorId = await getOrCreateEvaluatorId(analysisId);
+      const response = await submitAnalysisFeedback({
+        analysisId,
+        evaluatorId,
+        rating: value,
+      });
+      const savedRating = Number(response?.rating || value);
+      await saveFeedback(analysisId, savedRating);
+      setRating(savedRating);
+    } catch (submitError) {
+      setFeedbackError(
+        submitError?.message || "Não foi possível enviar sua avaliação."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const highlighted = hovered || rating || 0;
+
+  return (
+    <section className="feedback-card" aria-labelledby="feedback-title">
+      <h2 id="feedback-title">Como você avalia este resultado?</h2>
+      <p>Sua avaliação é anônima e opcional.</p>
+
+      {analysisId ? (
+        <div
+          className="star-rating"
+          role="radiogroup"
+          aria-label="Avaliação do resultado de uma a cinco estrelas"
+          onMouseLeave={() => setHovered(0)}
+        >
+          {[1, 2, 3, 4, 5].map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={value <= highlighted ? "selected" : ""}
+              onMouseEnter={() => !rating && setHovered(value)}
+              onFocus={() => !rating && setHovered(value)}
+              onBlur={() => setHovered(0)}
+              onClick={() => chooseRating(value)}
+              disabled={Boolean(rating) || submitting}
+              role="radio"
+              aria-checked={rating === value}
+              aria-label={`${value} ${value === 1 ? "estrela" : "estrelas"}`}
+              title={`${value} ${value === 1 ? "estrela" : "estrelas"}`}
+            >
+              ★
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="feedback-unavailable">
+          A avaliação ficará disponível quando a análise estiver salva.
+        </p>
+      )}
+
+      <div className="feedback-status" aria-live="polite">
+        {submitting && "Enviando avaliação…"}
+        {rating && "Obrigado! Sua avaliação foi registrada."}
+        {feedbackError && <span role="alert">{feedbackError}</span>}
+      </div>
+    </section>
+  );
+}
+
 
 function ScoreRing({ result }) {
   const score = getScore(result);
-  const color = getResultColor(result);
-
   return (
     <div
       className="score-ring"
       style={{
         "--score": score ?? 0,
-        "--result-color": color,
+        "--result-color": getResultColor(result),
       }}
     >
       <div className="score-content">
-        <strong>
-          {score === null ? "—" : `${formatScore(score)}%`}
-        </strong>
-
+        <strong>{score === null ? "—" : `${formatScore(score)}%`}</strong>
         <span>confiabilidade</span>
       </div>
     </div>
   );
 }
 
-/* =========================================================
-   SCORE
-   ========================================================= */
+
+function compactResult(result) {
+  return {
+    analysis: result?.analysis || null,
+    explanation: result?.explanation || "",
+    details: Array.isArray(result?.details) ? result.details : [],
+    evidence: result?.evidence
+      ? {
+          score: result.evidence.score,
+          coverage: result.evidence.coverage,
+          claim_count: result.evidence.claim_count,
+          evidence_count: result.evidence.evidence_count,
+        }
+      : null,
+    metadata: {
+      cache: result?.metadata?.cache || null,
+      explanation_source: result?.metadata?.explanation_source || null,
+    },
+  };
+}
+
+
+function clampStep(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(STEPS.length - 1, Math.trunc(number)));
+}
+
+
+function getAnalysisId(result) {
+  return String(result?.metadata?.cache?.analysis_id || "").trim();
+}
+
 
 function getScore(result) {
   const score =
@@ -487,126 +665,68 @@ function getScore(result) {
     result?.hybrid_score ??
     result?.analysis?.score;
 
-  if (score === undefined || score === null || score === "") {
-    return null;
-  }
-
+  if (score === undefined || score === null || score === "") return null;
   const numericScore = Number(score);
-
-  if (!Number.isFinite(numericScore)) {
-    return null;
-  }
-
-  return Math.max(
-    0,
-    Math.min(100, numericScore)
-  );
+  if (!Number.isFinite(numericScore)) return null;
+  return Math.max(0, Math.min(100, numericScore));
 }
+
 
 function formatScore(score) {
-  return Number.isInteger(score)
-    ? String(score)
-    : score.toFixed(1);
+  return Number.isInteger(score) ? String(score) : score.toFixed(1);
 }
 
-/* =========================================================
-   VEREDITO
-   ========================================================= */
 
 function getResultLabel(result) {
   const rawLabel =
-    result?.analysis?.label ??
-    result?.label ??
-    result?.label_final;
-
-  return String(rawLabel || "")
-    .trim()
-    .toLowerCase();
+    result?.analysis?.label ?? result?.label ?? result?.label_final;
+  return String(rawLabel || "").trim().toLowerCase();
 }
+
 
 function getVerdict(result) {
   const label = getResultLabel(result);
-
-  if (label) {
-    return formatStatus(label);
-  }
+  if (label) return formatStatus(label);
 
   const score = getScore(result);
-
   if (score === null) return "Resultado indisponível";
-
   if (score >= 70) return "Confiável";
   if (score >= 40) return "Parcialmente confiável";
   return "Não confiável";
 }
 
+
 function getVerdictIcon(result) {
   const label = getResultLabel(result);
-
-  if (label === "confiável") {
-    return "/circle-check-big.png";
-  }
-
-  if (label === "não confiável") {
-    return "/circle-x.png";
-  }
-
+  if (label === "confiável") return "/circle-check-big.png";
+  if (label === "não confiável") return "/circle-x.png";
   return "/triangle-alert.png";
 }
 
-/* =========================================================
-   CORES
-   ========================================================= */
 
 function getResultColor(result) {
   const label = getResultLabel(result);
-
-  if (label === "confiável") {
-    return "#16c784";
-  }
-
-  if (label === "não confiável") {
-    return "#ef4444";
-  }
-
+  if (label === "confiável") return "#16c784";
+  if (label === "não confiável") return "#ef4444";
   return "#f5a300";
 }
 
-/* =========================================================
-   ÍCONES DO RESULTADO
-   ========================================================= */
 
 function getEvidenceIcon(result) {
   const label = getResultLabel(result);
-
-  if (label === "confiável") {
-    return "/clipboard-list-green.png";
-  }
-
-  if (label === "não confiável") {
-    return "/clipboard-list-red.png";
-  }
-
+  if (label === "confiável") return "/clipboard-list-green.png";
+  if (label === "não confiável") return "/clipboard-list-red.png";
   return "/clipboard-list-ambar.png";
 }
 
+
 function getDetailsIcon(result) {
   const label = getResultLabel(result);
-
-  if (label === "confiável") {
-    return "/list-checks-green.png";
-  }
-
-  if (label === "não confiável") {
-    return "/list-checks-red.png";
-  }
-
+  if (label === "confiável") return "/list-checks-green.png";
+  if (label === "não confiável") return "/list-checks-red.png";
   return "/list-checks-ambar.png";
 }
 
-/* =========================================================
-   EXPLICAÇÃO
-   ========================================================= */
 
 function getExplanation(result) {
   const explanation =
@@ -615,20 +735,12 @@ function getExplanation(result) {
     result?.ai_explanation ??
     result?.analysis?.explanation;
 
-  if (
-    explanation &&
-    typeof explanation === "string" &&
-    explanation.trim()
-  ) {
+  if (typeof explanation === "string" && explanation.trim()) {
     return explanation.trim();
   }
-
-  return "A análise do HÍBRIA não encontrou informações suficientes para gerar uma explicação detalhada.";
+  return "Não foram encontradas informações suficientes para gerar uma explicação detalhada.";
 }
 
-/* =========================================================
-   FATORES
-   ========================================================= */
 
 function getFactors(result) {
   const factors =
@@ -639,105 +751,29 @@ function getFactors(result) {
     result?.analysis?.details ??
     result?.analysis?.factors;
 
-  if (
-    Array.isArray(factors) &&
-    factors.length > 0
-  ) {
+  if (Array.isArray(factors) && factors.length > 0) {
     return factors
       .map((factor) => {
-        if (typeof factor === "string") {
-          return factor;
-        }
-
-        if (factor?.description) {
-          return factor.description;
-        }
-
-        if (factor?.name) {
-          return factor.name;
-        }
-
+        if (typeof factor === "string") return factor;
+        if (factor?.description) return factor.description;
+        if (factor?.name) return factor.name;
         return JSON.stringify(factor);
       })
       .slice(0, 4);
   }
 
-  const evidenceScore =
-    result?.evidence?.score ??
-    result?.evidence_score ??
-    result?.analysis?.evidence_score;
-
-  const reputationStatus =
-    result?.source?.reputation?.status ??
-    result?.reputation?.status;
-
-  const factorsFound = [];
-
-  if (evidenceScore !== undefined) {
-    factorsFound.push(
-      `Score de evidências: ${evidenceScore}.`
-    );
-  }
-
-  if (reputationStatus) {
-    factorsFound.push(
-      `Reputação da fonte: ${formatStatus(
-        reputationStatus
-      )}.`
-    );
-  }
-
-  if (factorsFound.length > 0) {
-    return factorsFound;
-  }
-
   return [
     "Parte das informações não foi confirmada.",
-    "Fontes externas insuficientes.",
-    "Dados parcialmente verificáveis.",
+    "As fontes consultadas não foram suficientes.",
+    "O conteúdo foi verificado apenas parcialmente.",
   ];
 }
 
-/* =========================================================
-   FORMATAÇÃO
-   ========================================================= */
 
 function formatStatus(value) {
-  const text = String(value).replaceAll(
-    "_",
-    " "
-  );
-
-  return (
-    text.charAt(0).toUpperCase() +
-    text.slice(1)
-  );
+  const text = String(value).replaceAll("_", " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/* =========================================================
-   UTILITÁRIO
-   ========================================================= */
-
-function wait(ms, signal) {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException("Análise cancelada.", "AbortError"));
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      signal?.removeEventListener("abort", handleAbort);
-      resolve();
-    }, ms);
-
-    function handleAbort() {
-      window.clearTimeout(timeout);
-      signal?.removeEventListener("abort", handleAbort);
-      reject(new DOMException("Análise cancelada.", "AbortError"));
-    }
-
-    signal?.addEventListener("abort", handleAbort, { once: true });
-  });
-}
 
 export default App;

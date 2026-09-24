@@ -1,26 +1,10 @@
-const API_URL =
+export const API_URL =
   import.meta.env.VITE_HIBRIA_API_URL ||
   "https://hibria-tcc.duckdns.org";
 
-export async function analyzePage({
-  url,
-  title,
-  content,
-  signal,
-}) {
-  const response = await fetch(`${API_URL}/analyze`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      url,
-      title,
-      content,
-    }),
-    signal,
-  });
 
+async function apiRequest(path, options = {}) {
+  const response = await fetch(`${API_URL}${path}`, options);
   let data;
 
   try {
@@ -32,30 +16,68 @@ export async function analyzePage({
   }
 
   if (!response.ok) {
-    throw new Error(
-      data?.error ||
-        data?.detail ||
-        `Erro HTTP ${response.status}`
+    const error = new Error(
+      data?.error || data?.detail || `Erro HTTP ${response.status}`
     );
+    error.status = response.status;
+    throw error;
   }
+
+  return data;
+}
+
+
+export async function analyzePage({ url, title, content, signal }) {
+  const data = await apiRequest("/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, title, content }),
+    signal,
+  });
 
   if (data?.success === false) {
     throw new Error(
-      data.error ||
-        "A HÍBRIA não conseguiu analisar a página."
+      data.error || "A HÍBRIA não conseguiu analisar a página."
     );
   }
 
-  /*
-   * O backend pode retornar:
-   *
-   * { success: true, data: {...} }
-   *
-   * ou diretamente:
-   *
-   * {...}
-   *
-   * Aceitamos os dois formatos.
-   */
   return data?.data ?? data;
+}
+
+
+export function startAnalysisJob({ jobId, payload }) {
+  return apiRequest(`/analyze/jobs/${jobId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+
+export function getAnalysisJob(jobId) {
+  return apiRequest(`/analyze/jobs/${jobId}`);
+}
+
+
+export function cancelAnalysisJob(jobId) {
+  return apiRequest(`/analyze/jobs/${jobId}`, {
+    method: "DELETE",
+  });
+}
+
+
+export function submitAnalysisFeedback({
+  analysisId,
+  evaluatorId,
+  rating,
+}) {
+  return apiRequest("/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      analysis_id: analysisId,
+      evaluator_id: evaluatorId,
+      rating,
+    }),
+  });
 }

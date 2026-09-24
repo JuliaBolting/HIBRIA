@@ -128,7 +128,8 @@ button:focus-visible {
  */
 
 .app-shell.view-loading,
-.app-shell.view-result {
+.app-shell.view-result,
+.app-shell.view-restoring {
   width: 420px;
 }
 
@@ -229,6 +230,19 @@ button:focus-visible {
 
 .screen {
   position: relative;
+}
+
+
+.screen-restoring {
+  display: flex;
+  width: 420px;
+  height: 250px;
+  padding: 105px 32px 32px;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-align: center;
+  font-size: 14px;
 }
 
 
@@ -567,6 +581,29 @@ button:focus-visible {
 }
 
 
+.waiting-message {
+  min-height: 34px;
+  margin: 11px 12px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  animation: waiting-message-in 0.35s ease both;
+}
+
+
+@keyframes waiting-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
 /* =========================================================
    LISTA DE ETAPAS
    ========================================================= */
@@ -579,7 +616,7 @@ button:focus-visible {
   width: 100%;
 
   margin:
-    24px
+    14px
     0
     0;
 
@@ -1013,6 +1050,113 @@ button:focus-visible {
   background: var(--result-color);
 
   border-radius: 50%;
+}
+
+
+/* =========================================================
+   AVALIAÇÃO OPCIONAL DO RESULTADO
+   ========================================================= */
+
+.feedback-card {
+  width: 100%;
+  margin-bottom: 13px;
+  padding: 14px;
+  color: var(--text);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+
+.feedback-card h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+
+.feedback-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+
+.star-rating {
+  display: flex;
+  margin-top: 9px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+
+.star-rating button {
+  display: grid;
+  width: 35px;
+  height: 35px;
+  padding: 0;
+  place-items: center;
+  color: #aab1bc;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 27px;
+  line-height: 1;
+  transform-origin: center;
+  transition:
+    color 0.16s ease,
+    background 0.16s ease,
+    transform 0.16s ease;
+}
+
+
+.star-rating button:hover,
+.star-rating button:focus-visible {
+  background: rgba(245, 163, 0, 0.12);
+  transform: translateY(-2px) scale(1.08);
+}
+
+
+.star-rating button.selected {
+  color: #f5a300;
+  animation: star-pop 0.22s ease both;
+}
+
+
+.star-rating button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+
+@keyframes star-pop {
+  50% {
+    transform: scale(1.18) rotate(-5deg);
+  }
+}
+
+
+.feedback-status {
+  min-height: 18px;
+  margin-top: 4px;
+  color: #16865d;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+
+:root[data-theme="dark"] .feedback-status {
+  color: #5de3ae;
+}
+
+
+.feedback-status span,
+.feedback-unavailable {
+  color: #ef4444 !important;
 }
 
 
