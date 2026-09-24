@@ -49,7 +49,14 @@ class AnalysisRepository:
 
     @staticmethod
     def pipeline_version() -> str:
-        return os.getenv("HIBRIA_PIPELINE_VERSION", "1.0.0").strip() or "1.0.0"
+        return os.getenv("HIBRIA_PIPELINE_VERSION", "1.2.1").strip() or "1.2.1"
+
+    @staticmethod
+    def cache_ttl_hours() -> int:
+        try:
+            return max(0, int(os.getenv("HIBRIA_ANALYSIS_CACHE_TTL_HOURS", "168")))
+        except ValueError:
+            return 168
 
     @classmethod
     def normalize_url(cls, value: str) -> str:
@@ -110,6 +117,10 @@ class AnalysisRepository:
             WHERE hash_url = %(url_hash)s
               AND hash_conteudo = %(content_hash)s
               AND versao_pipeline = %(pipeline_version)s
+              AND (
+                    %(cache_ttl_hours)s = 0
+                    OR data_analise >= NOW() - (%(cache_ttl_hours)s * INTERVAL '1 hour')
+              )
             RETURNING id, resultado_json, data_analise, quantidade_consultas;
         """
 
@@ -121,7 +132,10 @@ class AnalysisRepository:
                 with connection.cursor(
                     cursor_factory=psycopg2.extras.RealDictCursor
                 ) as cursor:
-                    cursor.execute(query, identity)
+                    cursor.execute(
+                        query,
+                        {**identity, "cache_ttl_hours": self.cache_ttl_hours()},
+                    )
                     row = cursor.fetchone()
 
             if not row:
@@ -190,6 +204,16 @@ class AnalysisRepository:
             )
             ON CONFLICT (hash_url, hash_conteudo, versao_pipeline)
             DO UPDATE SET
+                url_original = EXCLUDED.url_original,
+                url_normalizada = EXCLUDED.url_normalizada,
+                titulo = EXCLUDED.titulo,
+                conteudo = EXCLUDED.conteudo,
+                score_final = EXCLUDED.score_final,
+                classificacao_final = EXCLUDED.classificacao_final,
+                explicacao = EXCLUDED.explicacao,
+                tempo_processamento_segundos = EXCLUDED.tempo_processamento_segundos,
+                resultado_json = EXCLUDED.resultado_json,
+                data_analise = NOW(),
                 ultima_consulta_em = NOW(),
                 quantidade_consultas = analises.quantidade_consultas + 1
             RETURNING id;

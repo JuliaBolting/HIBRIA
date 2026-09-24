@@ -69,6 +69,11 @@ class ResponseFormatter:
                 "render_method": result.render_method,
                 "paywall_detected": result.paywall_detected,
                 "warnings": result.warnings,
+                "explanation_source": getattr(
+                    result,
+                    "explanation_source",
+                    None,
+                ),
                 "processing_time": result._processing_time,
             },
         }
@@ -147,6 +152,17 @@ class ResponseFormatter:
                             "trusted_source",
                             None,
                         ),
+                        "retrieval_layer": getattr(
+                            evidence,
+                            "retrieval_layer",
+                            "",
+                        ),
+                        "source_type": getattr(
+                            evidence,
+                            "source_type",
+                            "",
+                        ),
+                        "metadata": getattr(evidence, "metadata", {}) or {},
                     }
                 )
 
@@ -159,4 +175,3 @@ class ResponseFormatter:
         )
 
         return response
-

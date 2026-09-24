@@ -86,6 +86,11 @@ button {
   font: inherit;
 }
 
+button:focus-visible {
+  outline: 3px solid rgba(6, 186, 209, 0.45);
+  outline-offset: 2px;
+}
+
 
 /* =========================================================
    CONTAINER PRINCIPAL
@@ -96,7 +101,9 @@ button {
 
   width: 368px;
 
-  overflow: hidden;
+  max-height: 600px;
+  overflow-x: hidden;
+  overflow-y: auto;
 
   color: var(--text);
   background: var(--background);
@@ -106,6 +113,7 @@ button {
    * Não usamos border-radius aqui porque o popup
    * do protótipo possui cantos retos.
    */
+  border: 1px solid var(--border);
   border-radius: 0;
 
   transition:
@@ -722,7 +730,7 @@ button {
   display: flex;
 
   width: 420px;
-  height: 638px;
+  min-height: 600px;
 
   padding:
     58px

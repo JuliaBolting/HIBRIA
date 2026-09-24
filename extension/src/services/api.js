@@ -2,8 +2,6 @@ const API_URL =
   import.meta.env.VITE_HIBRIA_API_URL ||
   "https://hibria-tcc.duckdns.org";
 
-const API_KEY = import.meta.env.VITE_HIBRIA_API_KEY || "";
-
 export async function analyzePage({
   url,
   title,
@@ -14,7 +12,6 @@ export async function analyzePage({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Hibria-Key": API_KEY,
     },
     body: JSON.stringify({
       url,

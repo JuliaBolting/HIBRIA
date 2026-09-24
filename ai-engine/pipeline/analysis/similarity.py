@@ -73,6 +73,7 @@ class EvidenceSimilarity:
     is_sufficient:        bool          # True se a evidência passou do corte mínimo de similaridade para ser considerada relevante
 
     rank:                 int           # posição no ranking (0 = mais similar)
+    metadata:             dict = field(default_factory=dict)
 
 
 @dataclass
@@ -317,6 +318,7 @@ class SimilarityCalculator:
                     similarity_final     = final_score,
                     is_sufficient        = is_sufficient,
                     rank                 = 0,  # atualizado abaixo
+                    metadata             = dict(getattr(ev, "metadata", {}) or {}),
                 ))
 
             # ordena por similarity_final decrescente e atribui rank

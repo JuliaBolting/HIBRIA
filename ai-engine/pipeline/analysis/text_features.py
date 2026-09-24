@@ -104,9 +104,9 @@ class TextFeatureExtractor:
     """
     Extrator heurístico de características textuais da HÍBRIA.
 
-    A ideia é gerar sinais explicáveis e baratos computacionalmente, úteis para
-    o aggregator.py e para o explanation_generator.py. Nenhuma lista abaixo é
-    vinculada a uma notícia específica; são marcadores gerais de estilo textual.
+    Gera sinais explicáveis para transparência e para a redação da explicação.
+    Eles não entram no score factual: estilo textual, sozinho, não prova nem
+    refuta uma notícia. Nenhuma lista é vinculada a uma notícia específica.
     """
 
     MIN_TEXT_CHARS: int = env_int("HIBRIA_TEXT_FEATURES_MIN_CHARS", 120)

@@ -10,9 +10,10 @@
 #   Camada 4 — Tavily Search
 #   Camada 5 — Serper/SerpApi/SearchAPI
 #   Camada 6 — GDELT
-#   Camada 7 — Crawlee Search (rastreamento direcionado de notícias)
-#   Camada 8 — IA fallback com Gemini Flash, apenas se ainda faltar evidência
-#   Camada 9 — Wikipedia (contexto enciclopédico, não prova principal)
+#   Camada 7 — NewsAPI
+#   Camada 8 — Crawlee Search (rastreamento direcionado de notícias)
+#   Camada 9 — IA fallback com Gemini Flash, apenas se ainda faltar evidência
+#   Camada 10 — Wikipedia (contexto enciclopédico, não prova principal)
 #
 # O retriever é tolerante a falhas: se uma camada falhar ou não tiver
 # API key configurada, registra o motivo e continua com as demais.
@@ -24,19 +25,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 import hashlib
 import json
 import logging
 import os
-from pathlib import Path
 import re
 import time
 import unicodedata
-import asyncio
-import threading
-import concurrent.futures
-from datetime import timedelta
 from dataclasses import dataclass, field
 from typing import Protocol
 from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
@@ -44,6 +39,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 import requests
 
 from .search_providers.quota import ProviderQuota
+from .source_trust import SourceTrustResolver
 
 logger = logging.getLogger(__name__)
 
@@ -182,8 +178,7 @@ class Evidence:
     def to_db_payload(self) -> dict:
         """
         Formato pronto para ser salvo futuramente em resultados_claims.
-        O PostgreSQL ainda não está integrado; por isso este método só prepara
-        os dados estruturados que serão usados pela API/DAO depois.
+        Os dados são consumidos pela persistência estruturada do PostgreSQL.
         """
         return {
             "claim_id": self.claim_id,
@@ -771,7 +766,7 @@ def _build_claim_search_query(
 
 
 # =============================================================================
-# Camada 1: Base Vetorial Local  ⭐⭐⭐⭐⭐
+# Fonte: Base Vetorial Local / FAISS
 #
 # Núcleo principal do retrieval. Documentos pré-indexados com embeddings
 # semânticos — busca por similaridade cosine via FAISS ou ChromaDB.
@@ -914,7 +909,7 @@ class VectorStoreSource:
 
 
 # =============================================================================
-# Camada 2: Wikipedia API  ⭐⭐⭐⭐
+# Fonte auxiliar: Wikipedia API (contexto, não prova principal)
 #
 # Complemento factual/enciclopédico. Sem API key, sempre disponível.
 # Estratégia de busca em duas etapas:
@@ -1101,7 +1096,7 @@ class WikipediaSource:
 
 
 # =============================================================================
-# Camada 3: APIs de Fact-Checking  ⭐⭐⭐⭐
+# Fonte: APIs de Fact-Checking
 #
 # Validação especializada por agências de checagem.
 # Requer API key — retorna lista vazia se não configurada.
@@ -1123,17 +1118,23 @@ class FactCheckSource(EvidenceSource):
 
     def __init__(self):
         self._api_key = os.getenv("GOOGLE_FACTCHECK_API_KEY", "").strip()
+        self._enabled = env_flag("HIBRIA_ENABLE_FACTCHECK", default=False)
 
     def is_available(self) -> bool:
         return bool(
-            self._api_key
+            self._enabled
+            and self._api_key
             and self._api_key.lower() not in {"sua_chave_aqui", "your_key_here"}
+            and ProviderQuota.can_use("google_factcheck")
         )
 
     def search(self, claim: Claim, top_k: int = 5) -> list[Evidence]:
         query = claim.normalized or claim.text
 
         if not query:
+            return []
+
+        if not ProviderQuota.try_register("google_factcheck"):
             return []
 
         params = {
@@ -1221,7 +1222,6 @@ class TavilySearchSource(EvidenceSource):
         self._api_key = os.getenv("TAVILY_API_KEY", "").strip()
         self._enabled = env_flag("HIBRIA_ENABLE_TAVILY", default=False)
         self._trusted_domains = split_env_list("HIBRIA_TRUSTED_DOMAINS")
-        self._daily_limit = env_int("HIBRIA_TAVILY_DAILY_LIMIT", 80)
         self._max_results = env_int("HIBRIA_TAVILY_MAX_RESULTS", 5)
         self._sleep_seconds = env_float("HIBRIA_TAVILY_SLEEP_SECONDS", 0.8)
         self._current_url = current_url
@@ -1236,42 +1236,11 @@ class TavilySearchSource(EvidenceSource):
             and time.time() >= self._rate_limited_until
         )
 
-    def _quota_file(self) -> Path:
-        return Path("data/runtime/tavily_quota.json")
-
-    def _read_quota(self) -> dict:
-        today = datetime.now().strftime("%Y-%m-%d")
-        quota_file = self._quota_file()
-
-        if not quota_file.exists():
-            return {"date": today, "count": 0}
-
-        try:
-            with open(quota_file, "r", encoding="utf-8") as file:
-                data = json.load(file)
-        except Exception:
-            return {"date": today, "count": 0}
-
-        if data.get("date") != today:
-            return {"date": today, "count": 0}
-
-        return {"date": today, "count": int(data.get("count", 0))}
-
-    def _write_quota(self, data: dict) -> None:
-        quota_file = self._quota_file()
-        quota_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(quota_file, "w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
-
     def _can_search(self) -> bool:
-        quota = self._read_quota()
-        return quota["count"] < self._daily_limit
+        return ProviderQuota.can_use("tavily")
 
-    def _register_search(self) -> None:
-        quota = self._read_quota()
-        quota["count"] += 1
-        self._write_quota(quota)
+    def _register_search(self) -> bool:
+        return ProviderQuota.try_register("tavily")
 
     def _is_same_url(self, url: str) -> bool:
         if env_flag("HIBRIA_ALLOW_SELF_EVIDENCE", default=False):
@@ -1321,6 +1290,9 @@ class TavilySearchSource(EvidenceSource):
             "Content-Type": "application/json",
         }
 
+        if not self._register_search():
+            return []
+
         try:
             response = requests.post(
                 self.API_URL,
@@ -1335,7 +1307,6 @@ class TavilySearchSource(EvidenceSource):
             )
             return []
 
-        self._register_search()
         time.sleep(self._sleep_seconds)
 
         if response.status_code == 429:
@@ -1649,7 +1620,7 @@ class SerpSearchSource(EvidenceSource):
 
 
 # =============================================================================
-# Camada 3: GDELT  ⭐⭐⭐⭐
+# Fonte: GDELT
 #
 # Busca notícias atuais em uma base jornalística aberta e gratuita.
 # Não substitui a validação por similarity + stance; apenas recupera
@@ -1666,7 +1637,6 @@ class GdeltSource(EvidenceSource):
         self._enabled = env_flag("HIBRIA_ENABLE_GDELT", default=False)
         self._trusted_domains = split_env_list("HIBRIA_TRUSTED_DOMAINS")
         self._document_context = normalize_space(document_context)
-        self._daily_limit = env_int("HIBRIA_GDELT_DAILY_LIMIT", 40)
         self._max_queries_per_claim = env_int("HIBRIA_GDELT_MAX_QUERIES_PER_CLAIM", 1)
         self._sleep_seconds = env_float("HIBRIA_GDELT_SLEEP_SECONDS", 1.2)
         self._rate_limited_until = 0.0
@@ -1674,42 +1644,11 @@ class GdeltSource(EvidenceSource):
     def is_available(self) -> bool:
         return self._enabled and time.time() >= self._rate_limited_until
 
-    def _quota_file(self) -> Path:
-        return Path("data/runtime/gdelt_quota.json")
-
-    def _read_quota(self) -> dict:
-        today = datetime.now().strftime("%Y-%m-%d")
-        quota_file = self._quota_file()
-
-        if not quota_file.exists():
-            return {"date": today, "count": 0}
-
-        try:
-            with open(quota_file, "r", encoding="utf-8") as file:
-                data = json.load(file)
-        except Exception:
-            return {"date": today, "count": 0}
-
-        if data.get("date") != today:
-            return {"date": today, "count": 0}
-
-        return {"date": today, "count": int(data.get("count", 0))}
-
-    def _write_quota(self, data: dict) -> None:
-        quota_file = self._quota_file()
-        quota_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(quota_file, "w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
-
     def _can_search(self) -> bool:
-        quota = self._read_quota()
-        return quota["count"] < self._daily_limit
+        return ProviderQuota.can_use("gdelt")
 
-    def _register_search(self) -> None:
-        quota = self._read_quota()
-        quota["count"] += 1
-        self._write_quota(quota)
+    def _register_search(self) -> bool:
+        return ProviderQuota.try_register("gdelt")
 
     @staticmethod
     def _sanitize_query(value: str, max_words: int = 14) -> str:
@@ -1809,6 +1748,9 @@ class GdeltSource(EvidenceSource):
             if len(evidences) >= top_k or not self._can_search():
                 break
 
+            if not self._register_search():
+                break
+
             params = {
                 "query": query,
                 "mode": "ArtList",
@@ -1825,8 +1767,6 @@ class GdeltSource(EvidenceSource):
                     f"[gdelt] falha de conexão/timeout; camada pausada: {exc}"
                 )
                 return []
-
-            self._register_search()
 
             if response.status_code == 429:
                 self._rate_limited_until = time.time() + 10 * 60
@@ -1910,7 +1850,7 @@ class GdeltSource(EvidenceSource):
 
 
 # =============================================================================
-# Camada 4: NewsAPI  ⭐⭐⭐⭐
+# Fonte: NewsAPI
 #
 # Busca complementar em notícias. No plano gratuito, é indicada para
 # desenvolvimento/testes e pode ter atraso, por isso não substitui GDELT.
@@ -1926,7 +1866,6 @@ class NewsApiSource(EvidenceSource):
         self._api_key = os.getenv("NEWSAPI_KEY", "").strip()
         self._enabled = env_flag("HIBRIA_ENABLE_NEWSAPI", default=False)
         self._trusted_domains = split_env_list("HIBRIA_TRUSTED_DOMAINS")
-        self._daily_limit = env_int("HIBRIA_NEWSAPI_DAILY_LIMIT", 80)
         self._document_context = normalize_space(document_context)
         self._rate_limited_until = 0.0
 
@@ -1938,42 +1877,11 @@ class NewsApiSource(EvidenceSource):
             and time.time() >= self._rate_limited_until
         )
 
-    def _quota_file(self) -> Path:
-        return Path("data/runtime/newsapi_quota.json")
-
-    def _read_quota(self) -> dict:
-        today = datetime.now().strftime("%Y-%m-%d")
-        quota_file = self._quota_file()
-
-        if not quota_file.exists():
-            return {"date": today, "count": 0}
-
-        try:
-            with open(quota_file, "r", encoding="utf-8") as file:
-                data = json.load(file)
-        except Exception:
-            return {"date": today, "count": 0}
-
-        if data.get("date") != today:
-            return {"date": today, "count": 0}
-
-        return {"date": today, "count": int(data.get("count", 0))}
-
-    def _write_quota(self, data: dict) -> None:
-        quota_file = self._quota_file()
-        quota_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(quota_file, "w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
-
     def _can_search(self) -> bool:
-        quota = self._read_quota()
-        return quota["count"] < self._daily_limit
+        return ProviderQuota.can_use("newsapi")
 
-    def _register_search(self) -> None:
-        quota = self._read_quota()
-        quota["count"] += 1
-        self._write_quota(quota)
+    def _register_search(self) -> bool:
+        return ProviderQuota.try_register("newsapi")
 
     def search(self, claim: Claim, top_k: int = 5) -> list[Evidence]:
         if not self._can_search():
@@ -1995,6 +1903,9 @@ class NewsApiSource(EvidenceSource):
 
         for query in queries:
             if len(evidences) >= top_k or not self._can_search():
+                break
+
+            if not self._register_search():
                 break
 
             params = {
@@ -2028,8 +1939,6 @@ class NewsApiSource(EvidenceSource):
 
             if not data:
                 return []
-
-            self._register_search()
 
             for item in data.get("articles", []):
                 url = item.get("url", "")
@@ -2087,10 +1996,10 @@ class NewsApiSource(EvidenceSource):
 
 
 # =============================================================================
-# Camada 5: Web Search (Brave / Tavily / SerpApi)  ⭐⭐
+# Fonte: Web Search / Brave
 #
-# Fallback web complementar. É acionada apenas quando as camadas anteriores
-# ainda não retornaram evidência boa o suficiente.
+# Busca web complementar. Com parada antecipada desativada, participa da busca
+# de todas as claims; com a opção ativada, pode ser pulada após evidência forte.
 #
 # Suporte atual:
 #   - Brave Search API (BRAVE_SEARCH_API_KEY)
@@ -2108,7 +2017,6 @@ class WebSearchSource(EvidenceSource):
         self._api_key = os.getenv("BRAVE_SEARCH_API_KEY", "").strip()
         self._enabled = env_flag("HIBRIA_ENABLE_WEB_SEARCH", default=False)
         self._trusted_domains = split_env_list("HIBRIA_TRUSTED_DOMAINS")
-        self._daily_limit = env_int("HIBRIA_WEB_SEARCH_DAILY_LIMIT", 80)
         self._current_url = current_url
         self._document_context = normalize_space(document_context)
         self._rate_limited_until = 0.0
@@ -2121,45 +2029,11 @@ class WebSearchSource(EvidenceSource):
             and time.time() >= self._rate_limited_until
         )
 
-    def _quota_file(self) -> Path:
-        return Path("data/runtime/brave_search_quota.json")
-
-    def _read_quota(self) -> dict:
-        today = datetime.now().strftime("%Y-%m-%d")
-        quota_file = self._quota_file()
-
-        if not quota_file.exists():
-            return {"date": today, "count": 0}
-
-        try:
-            with open(quota_file, "r", encoding="utf-8") as file:
-                data = json.load(file)
-        except Exception:
-            return {"date": today, "count": 0}
-
-        if data.get("date") != today:
-            return {"date": today, "count": 0}
-
-        return {
-            "date": today,
-            "count": int(data.get("count", 0)),
-        }
-
-    def _write_quota(self, data: dict) -> None:
-        quota_file = self._quota_file()
-        quota_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(quota_file, "w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
-
     def _can_search(self) -> bool:
-        quota = self._read_quota()
-        return quota["count"] < self._daily_limit
+        return ProviderQuota.can_use("brave")
 
-    def _register_search(self) -> None:
-        quota = self._read_quota()
-        quota["count"] += 1
-        self._write_quota(quota)
+    def _register_search(self) -> bool:
+        return ProviderQuota.try_register("brave")
 
     def _is_trusted_domain(self, url: str) -> bool:
         domain = extract_domain(url)
@@ -2216,6 +2090,9 @@ class WebSearchSource(EvidenceSource):
             "count": min(top_k, 10),
         }
 
+        if not self._register_search():
+            return []
+
         try:
             response = requests.get(
                 self.API_URL,
@@ -2229,8 +2106,6 @@ class WebSearchSource(EvidenceSource):
                 f"[web_search] falha de conexão/timeout; camada pausada: {exc}"
             )
             return []
-
-        self._register_search()
 
         if response.status_code == 429:
             self._rate_limited_until = time.time() + 10 * 60
@@ -2270,10 +2145,6 @@ class WebSearchSource(EvidenceSource):
             domain = extract_domain(url)
             trusted = self._is_trusted_domain(url)
 
-            # Por enquanto, só aceitamos resultados de domínios confiáveis.
-            if not trusted:
-                continue
-
             evidence_text = normalize_space(f"{title}. {snippet}")
 
             if not _is_relevant_candidate(claim, evidence_text, url):
@@ -2306,24 +2177,7 @@ class WebSearchSource(EvidenceSource):
 
 
 # =============================================================================
-# Camada 7: Crawlee Search  ⭐⭐⭐
-#
-# Busca por rastreamento direcionado de páginas jornalísticas.
-# A camada usa feeds públicos de notícias como ponto de partida, coleta URLs
-# candidatas e abre as páginas uma única vez. Depois, cada claim é comparada
-# com os trechos extraídos dessas páginas.
-#
-# Estratégia atual:
-#   1. Monta consultas globais a partir do contexto da notícia e das claims.
-#   2. Consulta Google News RSS e Bing News RSS sem usar APIs pagas.
-#   3. Abre um conjunto limitado de URLs candidatas e guarda o texto em cache.
-#   4. Para cada claim, escolhe o melhor trecho das páginas já rastreadas.
-#   5. Só faz busca pontual por claim quando o cache global não encontra nada.
-# =============================================================================
-
-
-# =============================================================================
-# Camada 7: Crawlee Search  ⭐⭐⭐
+# Fonte: Crawlee Search
 #
 # Busca por rastreamento direcionado de páginas jornalísticas.
 # A camada usa feeds públicos de notícias como ponto de partida, coleta URLs
@@ -2556,13 +2410,11 @@ def _crawlee_number_norms(text: str) -> set[str]:
 
 def _crawlee_required_numbers(claim_text: str) -> set[str]:
     """Seleciona números verificáveis, evitando dia/mês/ordem quando não são centrais."""
-    plain = _plain(claim_text)
     tokens = _significant_tokens(claim_text)
     required: set[str] = set()
 
     for item in _crawlee_number_mentions(claim_text):
         norm = str(item["norm"])
-        raw = str(item["raw"])
         if not norm:
             continue
 
@@ -2850,7 +2702,6 @@ class CrawleeSearchSource(EvidenceSource):
         self._trusted_domains = split_env_list("HIBRIA_TRUSTED_DOMAINS")
         self._current_url = current_url
         self._document_context = normalize_space(document_context)
-        self._daily_limit = env_int("HIBRIA_CRAWLEE_DAILY_LIMIT", 40)
         self._timeout_seconds = env_int("HIBRIA_CRAWLEE_TIMEOUT_SECONDS", 10)
         self._sleep_seconds = env_float("HIBRIA_CRAWLEE_SLEEP_SECONDS", 0.1)
         self._debug = env_flag("HIBRIA_CRAWLEE_DEBUG", default=False)
@@ -2884,37 +2735,14 @@ class CrawleeSearchSource(EvidenceSource):
             return False
         return True
 
-    def _quota_file(self) -> Path:
-        return Path("data/runtime/crawlee_search_quota.json")
-
-    def _read_quota(self) -> dict:
-        today = datetime.now().strftime("%Y-%m-%d")
-        quota_file = self._quota_file()
-        if not quota_file.exists():
-            return {"date": today, "count": 0}
-        try:
-            with open(quota_file, "r", encoding="utf-8") as file:
-                data = json.load(file)
-        except Exception:
-            return {"date": today, "count": 0}
-        if data.get("date") != today:
-            return {"date": today, "count": 0}
-        return {"date": today, "count": int(data.get("count", 0))}
-
-    def _write_quota(self, data: dict) -> None:
-        quota_file = self._quota_file()
-        quota_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(quota_file, "w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
-
     def _can_search(self) -> bool:
-        quota = self._read_quota()
-        return quota["count"] < self._daily_limit
+        return ProviderQuota.can_use("crawlee")
 
-    def _register_search(self, amount: int = 1) -> None:
-        quota = self._read_quota()
-        quota["count"] += max(1, amount)
-        self._write_quota(quota)
+    def _register_search(self, amount: int = 1) -> bool:
+        reserved = True
+        for _ in range(max(1, amount)):
+            reserved = ProviderQuota.try_register("crawlee") and reserved
+        return reserved
 
     def _is_same_url(self, url: str) -> bool:
         if env_flag("HIBRIA_ALLOW_SELF_EVIDENCE", default=False):
@@ -3435,7 +3263,7 @@ class CrawleeSearchSource(EvidenceSource):
 
 
 # =============================================================================
-# Camada 7: IA fallback com Gemini Flash  ⭐
+# Fonte de último recurso: IA fallback com Gemini Flash
 #
 # Último recurso de recuperação. Só deve ser acionado quando as camadas
 # anteriores não encontrarem evidência externa relevante. A IA não decide a
@@ -3460,7 +3288,6 @@ class AIFallbackSource(EvidenceSource):
         self._document_context = normalize_space(document_context)
         self._trusted_domains = split_env_list("HIBRIA_TRUSTED_DOMAINS")
         self._min_confidence = env_float("HIBRIA_AI_FALLBACK_MIN_CONFIDENCE", 0.45)
-        self._daily_limit = env_int("HIBRIA_AI_FALLBACK_DAILY_LIMIT", 20)
         self._max_queries_per_claim = env_int(
             "HIBRIA_AI_FALLBACK_MAX_QUERIES_PER_CLAIM", 1
         )
@@ -3476,42 +3303,11 @@ class AIFallbackSource(EvidenceSource):
             and time.time() >= self._rate_limited_until
         )
 
-    def _quota_file(self) -> Path:
-        return Path("data/runtime/ai_fallback_quota.json")
-
-    def _read_quota(self) -> dict:
-        today = datetime.now().strftime("%Y-%m-%d")
-        quota_file = self._quota_file()
-
-        if not quota_file.exists():
-            return {"date": today, "count": 0}
-
-        try:
-            with open(quota_file, "r", encoding="utf-8") as file:
-                data = json.load(file)
-        except Exception:
-            return {"date": today, "count": 0}
-
-        if data.get("date") != today:
-            return {"date": today, "count": 0}
-
-        return {"date": today, "count": int(data.get("count", 0))}
-
-    def _write_quota(self, data: dict) -> None:
-        quota_file = self._quota_file()
-        quota_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(quota_file, "w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
-
     def _can_search(self) -> bool:
-        quota = self._read_quota()
-        return quota["count"] < self._daily_limit
+        return ProviderQuota.can_use("ai_fallback")
 
-    def _register_search(self) -> None:
-        quota = self._read_quota()
-        quota["count"] += 1
-        self._write_quota(quota)
+    def _register_search(self) -> bool:
+        return ProviderQuota.try_register("ai_fallback")
 
     def _is_same_url(self, url: str) -> bool:
         if env_flag("HIBRIA_ALLOW_SELF_EVIDENCE", default=False):
@@ -3676,6 +3472,9 @@ Formato se não encontrar:
             },
         }
 
+        if not self._register_search():
+            return []
+
         try:
             response = requests.post(
                 url,
@@ -3691,7 +3490,6 @@ Formato se não encontrar:
             )
             return []
 
-        self._register_search()
         time.sleep(self._sleep_seconds)
 
         if response.status_code == 429:
@@ -3782,16 +3580,12 @@ class EvidenceRetriever:
       4. Rerankeai por similaridade decrescente
       5. Retorna as top_k evidências mais relevantes
 
-    A estratégia de parada antecipada (early stopping) evita chamar
-    camadas desnecessárias quando as prioritárias já retornaram
-    evidências suficientes. Camada 4 (web_search) raramente é acionada.
+    A parada antecipada é opcional e evita chamadas adicionais quando uma
+    evidência já aprovada é suficiente.
     """
 
     # threshold mínimo de similaridade para incluir uma evidência
     MIN_SIMILARITY: float = env_float("HIBRIA_RETRIEVER_MIN_SIMILARITY", 0.12)
-
-    # número mínimo de evidências antes de considerar early stopping
-    EARLY_STOP_COUNT: int = env_int("HIBRIA_RETRIEVAL_TOP_K", 10)
 
     # snippets de NewsAPI/GDELT/Brave podem ser curtos, então o corte não pode ser alto demais
     MIN_EVIDENCE_CHARS: int = env_int("HIBRIA_MIN_EVIDENCE_CHARS", 50)
@@ -3837,6 +3631,7 @@ class EvidenceRetriever:
         document_context: contexto do documento que está sendo analisado.
         """
         self._document_context = normalize_space(document_context)
+        self._trust_resolver = SourceTrustResolver()
         self._sources: list[EvidenceSource] = [
             VectorStoreSource(vector_store, current_url=current_url),
             FactCheckSource(),
@@ -3853,6 +3648,9 @@ class EvidenceRetriever:
                 document_context=self._document_context,
             ),
             GdeltSource(
+                document_context=self._document_context,
+            ),
+            NewsApiSource(
                 document_context=self._document_context,
             ),
             CrawleeSearchSource(
@@ -4021,6 +3819,21 @@ class EvidenceRetriever:
                 and evidence.similarity >= self.MIN_SIMILARITY
             ]
 
+            for evidence in valid_evidences:
+                if evidence.source_type == "fact_check":
+                    evidence.trusted_source = True
+                    continue
+                trusted, reputation = self._trust_resolver.resolve(
+                    evidence.domain or evidence.url
+                )
+                evidence.trusted_source = bool(
+                    evidence.trusted_source or trusted
+                )
+                evidence.metadata["dynamic_source_reputation"] = reputation
+                evidence.metadata["trust_source"] = (
+                    "dynamic_reputation" if trusted else "not_evaluated_or_below_threshold"
+                )
+
             if valid_evidences:
                 all_evidences.extend(valid_evidences)
                 layers_used.append(source.name)
@@ -4058,7 +3871,8 @@ class EvidenceRetriever:
         Processa múltiplos claims em sequência.
         Adiciona delay entre claims para respeitar rate limits das APIs.
 
-        FUTURO: processamento paralelo com asyncio para claims independentes.
+        A execução é sequencial de propósito para respeitar as franquias e os
+        limites de frequência dos provedores externos.
         """
         for source in self._sources:
             prepare = getattr(source, "prepare_for_claims", None)
