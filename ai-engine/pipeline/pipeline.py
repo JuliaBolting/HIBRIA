@@ -1025,6 +1025,8 @@ class HibriaPipeline:
             result.explanation = report.get("explanation")
             result.details = list(report.get("details") or [])[:4]
             result.explanation_source = report.get("source") or "qwen"
+            result.explanation_version = report.get("version")
+            result.explanation_validation = report.get("validation", {})
             logger.info(
                 "[explanation_generator] explicação e detalhes gerados com sucesso "
                 f"(origem={result.explanation_source})"
@@ -1034,6 +1036,7 @@ class HibriaPipeline:
             result.explanation = fallback["explanation"]
             result.details = fallback["details"]
             result.explanation_source = "fallback"
+            result.explanation_version = ExplanationGenerator.VERSION
             result.warnings.append(
                 "[explanation_generator] Qwen local indisponível — "
                 "usada explicação determinística de contingência"

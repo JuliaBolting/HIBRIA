@@ -462,8 +462,9 @@ class StanceModel:
         evidence_numbers = cls._extract_numbers(evidence_norm)
 
         has_contradiction_marker = cls._has_contradiction_marker(evidence_norm)
-        claim_has_negation = cls._has_any_term(claim_norm, cls.NEGATION_TERMS)
-        evidence_has_negation = cls._has_any_term(evidence_norm, cls.NEGATION_TERMS)
+        # Uma negação em outra frase ou no nome de um veículo não refuta a
+        # informação comparada. Exige oposição numa frase fortemente alinhada.
+        negation_conflict = cls._aligned_negation_conflict(claim_text, evidence_text)
         numbers_conflict = cls._numbers_conflict(claim_numbers, evidence_numbers, overlap)
 
         if numbers_conflict:
@@ -482,7 +483,7 @@ class StanceModel:
                 **base_kwargs,
             )
 
-        if claim_has_negation != evidence_has_negation and overlap >= cls.MIN_OVERLAP_SUPPORT:
+        if negation_conflict and overlap >= cls.MIN_OVERLAP_SUPPORT:
             return StanceResult(
                 stance=STANCE_CONTRADICT,
                 confidence=0.64,
@@ -520,6 +521,26 @@ class StanceModel:
             reason="A evidência recuperada não possui relação textual suficiente com a claim.",
             **base_kwargs,
         )
+
+    @classmethod
+    def _aligned_negation_conflict(cls, claim_text: str, evidence_text: str) -> bool:
+        claim_norm = cls._normalize_text(claim_text)
+        negation = r"\b(?:nao|nunca|jamais)\b"
+        claim_negative = bool(re.search(negation, claim_norm))
+        sentences = re.split(r"[.!?;\n]+", re.sub(r"<[^>]+>", " ", evidence_text))
+        candidates = []
+        for sentence in sentences:
+            normalized = cls._normalize_text(sentence)
+            overlap = cls._keyword_overlap(claim_norm, normalized)
+            # Relação temática parcial não estabelece oposição lógica.
+            if overlap >= .75:
+                candidates.append((overlap, bool(re.search(negation, normalized))))
+        if not candidates:
+            return False
+        best_overlap = max(score for score, _ in candidates)
+        closest = [negative for score, negative in candidates if score == best_overlap]
+        # Se os trechos igualmente próximos discordam entre si, não concluir.
+        return all(negative != claim_negative for negative in closest)
 
     @classmethod
     def _build_claim_map(cls, retrieval_results: list) -> dict[str, Any]:

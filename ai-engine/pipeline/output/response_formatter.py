@@ -75,6 +75,8 @@ class ResponseFormatter:
                     None,
                 ),
                 "processing_time": result._processing_time,
+                "explanation_version": getattr(result, "explanation_version", None),
+                "explanation_validation": getattr(result, "explanation_validation", {}),
             },
         }
 
@@ -112,6 +114,7 @@ class ResponseFormatter:
 
                 claim_data["evidences"].append(
                     {
+                        "evidence_id": getattr(evidence, "evidence_id", ""),
                         "text": getattr(
                             evidence,
                             "text",
