@@ -51,8 +51,12 @@ def sample_result() -> SimpleNamespace:
     return SimpleNamespace(
         label_final="evidência insuficiente",
         title="Quaest: disputa presidencial em 7 estados e no DF",
+        score_final=42.11,
         score_breakdown={
             "coverage_score": 10.0,
+            "evidence_score": 56.53,
+            "reputation_score": 95.0,
+            "bertimbau_score": 99.79,
             "stance_stats": {
                 "support": 8,
                 "contradict": 3,
@@ -115,6 +119,51 @@ class ExplanationV4Tests(unittest.TestCase):
         self.assertIn("verificacoes_relevantes", prompt)
         self.assertIn("resumo_numerico", prompt)
         self.assertLessEqual(len(prompt), ExplanationGenerator.MAX_INPUT_CHARS)
+
+    def test_fallback_explains_positive_and_decisive_factors(self):
+        report = ExplanationGenerator.fallback_report(sample_result())
+
+        self.assertIn("95", report["explanation"])
+        self.assertIn("99,8", report["explanation"])
+        self.assertIn("10%", report["explanation"])
+        self.assertIn("42,1", report["explanation"])
+        self.assertIn("evidência insuficiente", report["explanation"])
+        self.assertIn("8", report["details"][0])
+        self.assertIn("3", report["details"][0])
+        self.assertIn("6", report["details"][0])
+
+    def test_rounded_known_metrics_are_accepted(self):
+        model_report = {
+            "explanation": (
+                "Mesmo com reputação da fonte de 95 em 100 e sinal textual de "
+                "99,8 em 100, somente 10% do conteúdo importante recebeu evidência "
+                "válida. Isso limitou o índice a 42,1 de 100 e levou ao resultado "
+                "\"evidência insuficiente\"."
+            ),
+            "details": [
+                "Nas verificações, 8 resultados receberam confirmação, 3 "
+                "apresentaram diferenças e 6 ficaram sem confirmação direta.",
+                "A reputação da fonte e o sinal textual contribuíram "
+                "positivamente, mas não confirmam os fatos sozinhos.",
+                "O alcance limitado das evidências foi decisivo e reduziu a "
+                "nota; a falta de confirmação não prova que a notícia seja falsa.",
+            ],
+        }
+        context = ExplanationGenerator._build_context(sample_result())
+        fallback = ExplanationGenerator._fallback_report_from_context(
+            sample_result(),
+            context,
+        )
+
+        checked = ExplanationGenerator._validate_model_report(
+            model_report,
+            result=sample_result(),
+            context=context,
+            fallback=fallback,
+        )
+
+        self.assertEqual(checked["source"], "qwen")
+        self.assertEqual(checked["explanation"], model_report["explanation"])
 
     def test_context_keeps_all_available_verification_points(self):
         result = sample_result()

@@ -249,30 +249,35 @@ class ExplanationGenerator:
         return """
 /no_think
 
-Você é somente o redator final de uma verificação de notícia. A classificação,
-as contagens e os fatores da nota já foram calculados. Você apenas transforma
-esses dados em uma explicação clara. Não refaça a análise.
+Você é o redator final de uma verificação de notícia. A classificação,
+as contagens e as notas já foram calculadas. Sua tarefa é responder, em linguagem
+simples: "por que esta notícia recebeu esse resultado?". Não refaça a análise.
 
-Leia todas as informações verificadas para entender o assunto, mas NÃO as cite,
-enumere ou junte em uma frase. Faça uma síntese geral do que as verificações
-mostraram e de por que o resultado foi atribuído.
+Construa uma explicação equilibrada usando os fatores que realmente formaram a
+nota. Mostre primeiro o que contribuiu positivamente e depois a limitação que
+foi decisiva. A boa reputação da fonte e o sinal textual são fatores auxiliares:
+eles podem aumentar a nota, mas não comprovam os fatos da notícia.
 
 Escreva para uma pessoa leiga:
-- "explanation": duas frases naturais sobre o resultado geral da análise, sem
-  números e sem recontar uma informação específica da notícia.
+- "explanation": duas ou três frases naturais que contrastem os sinais
+  favoráveis com o fator decisivo, expliquem o efeito no índice final e mencionem
+  a classificação uma única vez. Use os números da ficha quando eles tornarem a
+  explicação mais clara.
 - detalhe 1: informe corretamente quantas confirmações, diferenças e casos sem
   confirmação direta ocorreram.
-- detalhe 2: explique quanto do conteúdo pôde ser verificado e qual foi o motivo
-  determinante da classificação.
-- detalhe 3: explique como isso afetou a nota e como o resultado deve ser
-  interpretado, sem declarar que a notícia é verdadeira ou falsa.
+- detalhe 2: explique quais fatores auxiliares contribuíram positivamente e
+  deixe claro que eles não confirmam os fatos por conta própria.
+- detalhe 3: explique quanto do conteúdo importante recebeu evidência válida,
+  por que isso foi decisivo e como afetou a nota.
 
 Não troque "diferença" por "sem confirmação": são resultados distintos.
 Não use as palavras "afirmação", "claim", "cobertura", "comparações", "score",
 "pipeline", "modelo", "classificador", "BERTimbau" ou "similaridade".
-Não cite sites ou fontes. Não diga "a HÍBRIA encontrou". Não repita a
-classificação mais de uma vez em toda a resposta. Não repita ideias entre os
-quatro textos. Use português do Brasil, frases completas e pontuação final.
+Não cite sites ou nomes de veículos. Não diga "a HÍBRIA encontrou". Não
+resuma o assunto da notícia nem transforme as informações verificadas em uma
+lista. Não repita a classificação mais de uma vez em toda a resposta. Não
+repita ideias entre os quatro textos. Use português do Brasil, frases completas
+e pontuação final.
 
 Não invente fatos ou números. Retorne somente o JSON do schema, com no máximo
 300 caracteres na explicação e 260 em cada um dos três detalhes.
@@ -527,38 +532,57 @@ Não invente fatos ou números. Retorne somente o JSON do schema, com no máximo
                 "principais da notícia."
             )
 
+        factors = safe_context.get("fatores_que_formaram_a_nota") or {}
+        reputation = cls._metric_text(factors.get("reputacao_da_fonte"))
+        textual = cls._metric_text(factors.get("sinal_textual_auxiliar"))
+        evidence = cls._metric_text(factors.get("forca_das_evidencias"))
+        coverage = cls._metric_text(
+            factors.get("parte_do_conteudo_com_evidencia_valida")
+        )
+
+        positive_parts: list[str] = []
+        if reputation:
+            positive_parts.append(
+                f"a reputação da fonte foi {reputation} de 100"
+            )
+        if textual:
+            positive_parts.append(
+                f"o sinal auxiliar do texto foi {textual} de 100"
+            )
+        if positive_parts:
+            second_detail = (
+                f"Como fatores favoráveis, {' e '.join(positive_parts)}. "
+                "Esses sinais ajudam na nota, mas não confirmam os fatos sozinhos."
+            )
+        else:
+            second_detail = (
+                "Os fatores auxiliares foram considerados na nota, mas não "
+                "confirmam os fatos da notícia por conta própria."
+            )
+
         reach = str(
             safe_context.get("quanto_do_conteudo_importante_foi_verificado")
             or "não foi possível medir quanto do conteúdo pôde ser verificado"
         )
-        reason = str(
-            safe_context.get("motivo_determinante")
-            or "O conjunto dos fatores disponíveis determinou a classificação."
-        )
-        second_detail = (
-            f"{reach[:1].upper() + reach[1:]}. {reason}"
-        )
-
-        label = str(getattr(result, "label_final", None) or "").casefold()
-        if label in {"evidência insuficiente", "não verificado"}:
-            third_detail = (
-                "A falta de confirmação para o restante reduziu a nota. Isso "
-                "não significa, por si só, que a notícia seja falsa."
+        reach = reach[:1].upper() + reach[1:]
+        metric_parts: list[str] = []
+        if evidence:
+            metric_parts.append(
+                f"as evidências localizadas tiveram força {evidence} de 100"
             )
-        elif label == "não confiável":
-            third_detail = (
-                "As diferenças encontradas reduziram a nota. É recomendável "
-                "conferir o conteúdo em outras fontes."
+        if coverage:
+            metric_parts.append(
+                f"somente {coverage}% do conteúdo importante teve evidência válida"
             )
-        elif label == "confiável":
+        measured = ", mas ".join(metric_parts)
+        if measured:
             third_detail = (
-                "O conjunto de confirmações elevou a nota, sem garantir que "
-                "todas as informações estejam corretas."
+                f"{measured[:1].upper() + measured[1:]}. Esse alcance limitado "
+                "foi decisivo e reduziu a nota."
             )
         else:
             third_detail = (
-                "Como apenas parte do conteúdo pôde ser confirmada, a nota "
-                "permaneceu intermediária."
+                f"{reach}. Esse alcance foi decisivo para a nota final."
             )
 
         return [
@@ -580,53 +604,63 @@ Não invente fatos ou números. Retorne somente o JSON do schema, com no máximo
     ) -> str:
         """Resume a decisão sem vocabulário técnico ou oposição falsa."""
         safe_context = context or cls._build_context(result)
-        breakdown = getattr(result, "score_breakdown", None) or {}
-        stance = breakdown.get("stance_stats") or {}
-        supports = int(stance.get("support", 0) or 0)
-        contradictions = int(stance.get("contradict", 0) or 0)
-        coverage = cls._coverage_description(breakdown.get("coverage_score"))
+        factors = safe_context.get("fatores_que_formaram_a_nota") or {}
         label = str(getattr(result, "label_final", None) or "não verificado")
+        final_score = cls._metric_text(factors.get("indice_final"))
+        coverage = cls._metric_text(
+            factors.get("parte_do_conteudo_com_evidencia_valida")
+        )
+        reputation = cls._metric_text(factors.get("reputacao_da_fonte"))
+        textual = cls._metric_text(factors.get("sinal_textual_auxiliar"))
 
-        if supports and contradictions:
-            finding = (
-                "Algumas informações foram confirmadas, enquanto outras não "
-                "coincidiram com o que foi encontrado"
-            )
-        elif contradictions:
-            finding = (
-                "Algumas informações não coincidiram com o que foi encontrado"
-            )
-        elif supports:
-            finding = "As informações verificadas receberam confirmação"
-        else:
-            finding = "Não foi possível confirmar diretamente as informações principais"
+        favorable: list[str] = []
+        if reputation:
+            favorable.append(f"reputação da fonte de {reputation} em 100")
+        if textual:
+            favorable.append(f"sinal textual de {textual} em 100")
+        favorable_text = " e ".join(favorable)
 
-        if coverage == "ampla":
-            reach = "a maior parte da notícia pôde ser verificada"
-        elif coverage == "parcial":
-            reach = "apenas parte da notícia pôde ser verificada"
-        elif coverage == "baixa":
-            reach = "poucas partes da notícia puderam ser verificadas"
+        if favorable_text and coverage:
+            opening = (
+                f"Mesmo com {favorable_text}, somente {coverage}% do conteúdo "
+                "importante recebeu evidência válida"
+            )
+        elif coverage:
+            opening = (
+                f"Somente {coverage}% do conteúdo importante recebeu evidência "
+                "válida"
+            )
         else:
-            reach = "não houve informações suficientes para verificar a notícia"
+            opening = str(
+                safe_context.get("motivo_determinante")
+                or "O conjunto das verificações determinou o resultado"
+            ).rstrip(".")
+
+        if final_score:
+            consequence = (
+                f"Essa limitação deixou o índice em {final_score} de 100 e "
+                f"levou ao resultado \"{label}\""
+            )
+        else:
+            consequence = f"Essa limitação levou ao resultado \"{label}\""
 
         if label.casefold() in {"evidência insuficiente", "não verificado"}:
-            consequence = (
-                "o conjunto das verificações não foi suficiente para sustentar "
-                "todo o conteúdo"
-            )
-        elif label.casefold() == "não confiável":
-            consequence = "as diferenças encontradas reduziram a nota"
-        elif label.casefold() == "confiável":
-            consequence = "o conjunto das verificações sustentou o resultado"
-        else:
-            consequence = (
-                "o conjunto das verificações sustentou apenas parte do conteúdo"
-            )
+            consequence += "; a falta de confirmação não prova que a notícia seja falsa"
 
-        explanation = f"{finding}. Como {reach}, {consequence}."
+        explanation = f"{opening}. {consequence}."
 
         return cls._limit_output_text(explanation, 300)
+
+    @staticmethod
+    def _metric_text(value: Any) -> str:
+        """Formata uma métrica para leitura humana sem casas desnecessárias."""
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return ""
+        if number.is_integer():
+            return str(int(number))
+        return f"{number:.1f}".replace(".", ",")
 
     @staticmethod
     def _is_plain_explanation(value: Any) -> bool:
@@ -745,8 +779,6 @@ Não invente fatos ou números. Retorne somente o JSON do schema, com no máximo
             return False
         if cls._label_occurrences(text, label) > 1:
             return False
-        if cls._number_tokens(text):
-            return False
         if not cls._numbers_are_allowed(text, context):
             return False
 
@@ -863,12 +895,28 @@ Não invente fatos ou números. Retorne somente o JSON do schema, com no máximo
         value: Any,
         context: dict[str, Any],
     ) -> bool:
-        allowed = set(
-            cls._number_tokens(
-                json.dumps(context, ensure_ascii=False)
-            )
-        )
-        return set(cls._number_tokens(value)).issubset(allowed)
+        # As métricas públicas usam escala de 0 a 100. O limite da escala pode
+        # aparecer como "de 100" mesmo quando o JSON contém apenas o valor.
+        allowed: set[str] = {"100"}
+        for token in cls._number_tokens(
+            json.dumps(context, ensure_ascii=False)
+        ):
+            normalized = token.replace(",", ".")
+            allowed.add(normalized)
+            try:
+                number = float(normalized)
+            except ValueError:
+                continue
+            allowed.add(f"{number:.1f}")
+            allowed.add(f"{number:.2f}")
+            if number.is_integer():
+                allowed.add(str(int(number)))
+
+        received = {
+            token.replace(",", ".")
+            for token in cls._number_tokens(value)
+        }
+        return received.issubset(allowed)
 
     @classmethod
     def _required_count_tokens(cls, context: dict[str, Any]) -> set[str]:
@@ -1012,13 +1060,21 @@ Não invente fatos ou números. Retorne somente o JSON do schema, com no máximo
         return f"""
 /no_think
 
-Use somente a ficha abaixo. Considere todas as verificações para entender o
-conjunto, mas sintetize o resultado sem citar ou enumerar cada informação da
-notícia. Não copie o título.
+Use somente a ficha abaixo. Ela contém tudo o que foi calculado. As
+"verificacoes_relevantes" servem apenas para você compreender o conjunto; não
+as copie, não as enumere e não faça um resumo do tema da notícia.
+
+A resposta deve explicar a formação da nota:
+1. reconheça os fatores favoráveis de "fatores_que_formaram_a_nota";
+2. contraste-os com "quanto_do_conteudo_importante_foi_verificado" e
+   "motivo_determinante";
+3. relacione essa limitação ao índice e à classificação final;
+4. não trate reputação da fonte nem sinal textual como prova factual.
 
 O primeiro detalhe deve manter em algarismos todas as contagens maiores que
-zero de "resumo_numerico" e usar cada uma com seu significado correto. Use
-"motivo_determinante" para explicar a decisão no segundo detalhe. Retorne
+zero de "resumo_numerico" e usar cada uma com seu significado correto. O
+segundo deve explicar os fatores auxiliares favoráveis. O terceiro deve
+explicar o alcance limitado das evidências e seu efeito na nota. Retorne
 somente o objeto JSON solicitado, sem marcadores ou numeração.
 
 FICHA VALIDADA:
