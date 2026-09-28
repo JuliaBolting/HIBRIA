@@ -131,7 +131,7 @@ class ExplanationGenerator:
                 "think": False,
                 "format": cls.OUTPUT_SCHEMA,
                 "options": {
-                    "temperature": 0.1,
+                    "temperature": 0.2,
                     "top_p": 0.8,
                     "top_k": 20,
                     "num_ctx": 4096,
@@ -273,8 +273,15 @@ Regras obrigatórias:
 - Não escreva “a HÍBRIA encontrou” ou “a HÍBRIA classificou”.
 - Não mencione sites, veículos, consultorias ou fontes.
 - Mantenha os três detalhes na mesma ordem do texto-base.
+- Reformule de verdade: nenhuma frase pode ser uma cópia literal do texto-base.
+- Na explicação, apresente primeiro o resultado e depois o motivo em linguagem
+  simples. Não repita o título da notícia.
+- No primeiro detalhe, explique as confirmações e diferenças; no segundo,
+  explique quanto do conteúdo pôde ser verificado; no terceiro, explique como
+  isso afetou o resultado e o cuidado necessário ao interpretá-lo.
 - Não repita ideias. Termine todas as frases com pontuação.
-- Se não conseguir melhorar uma frase sem mudar seu sentido, copie a frase-base.
+- Se não conseguir reformular com segurança, devolva o texto-base; a HÍBRIA
+  identificará a cópia e usará a versão determinística.
 
 Retorne somente o JSON solicitado:
 - “explanation”: uma ou duas frases, no máximo 300 caracteres.
@@ -410,25 +417,19 @@ Retorne somente o JSON solicitado:
         coverage = cls._coverage_description(breakdown.get("coverage_score"))
         label = str(getattr(result, "label_final", None) or "não verificado")
 
-        title = cls._truncate_text(
-            getattr(result, "title", "") or "",
-            105,
-        ).rstrip("…")
-        prefix = f'Na notícia “{title}”, ' if title else "Na notícia, "
-
         if supports and contradictions:
             finding = (
-                "algumas informações foram confirmadas, enquanto outras não "
+                "Algumas informações foram confirmadas, enquanto outras não "
                 "coincidiram com o que foi encontrado"
             )
         elif contradictions:
             finding = (
-                "algumas informações não coincidiram com o que foi encontrado"
+                "Algumas informações não coincidiram com o que foi encontrado"
             )
         elif supports:
-            finding = "as informações verificadas receberam confirmação"
+            finding = "As informações verificadas receberam confirmação"
         else:
-            finding = "não foi possível confirmar diretamente as informações principais"
+            finding = "Não foi possível confirmar diretamente as informações principais"
 
         if coverage == "ampla":
             reach = "a maior parte da notícia pôde ser verificada"
@@ -440,7 +441,7 @@ Retorne somente o JSON solicitado:
             reach = "não houve informações suficientes para verificar a notícia"
 
         explanation = (
-            f"{prefix}{finding}. Como {reach}, o resultado foi \"{label}\"."
+            f'{finding}. Como {reach}, o resultado foi "{label}".'
         )
         if label.casefold() in {"evidência insuficiente", "não verificado"}:
             explanation += " Isso não significa que a notícia seja falsa."
@@ -520,6 +521,8 @@ Retorne somente o JSON solicitado:
             return False
         if cls._text_overlap(text, reference) < 0.25:
             return False
+        if cls._same_wording(text, reference):
+            return False
         return True
 
     @classmethod
@@ -546,11 +549,26 @@ Retorne somente o JSON solicitado:
             return False
         if cls._has_conflicting_label(" ".join(normalized), label):
             return False
+        if any(
+            cls._same_wording(candidate, original)
+            for candidate, original in zip(normalized, reference)
+        ):
+            return False
 
         return all(
             cls._text_overlap(candidate, original) >= 0.25
             for candidate, original in zip(normalized, reference)
         )
+
+    @staticmethod
+    def _same_wording(first: Any, second: Any) -> bool:
+        """Impede que uma cópia literal seja atribuída ao Qwen."""
+        normalize = lambda value: re.sub(
+            r"\s+",
+            " ",
+            str(value or "").strip().casefold(),
+        )
+        return normalize(first) == normalize(second)
 
     @staticmethod
     def _number_tokens(value: Any) -> list[str]:
@@ -681,9 +699,11 @@ Retorne somente o JSON solicitado:
         return f"""
 /no_think
 
-Reescreva somente o texto-base validado para deixá-lo mais natural.
-Não acrescente nem retire informações. Preserve literalmente todos os números
-e a classificação final. Retorne somente o objeto JSON solicitado.
+Reescreva todos os quatro textos do texto-base validado para deixá-los mais
+naturais. Não copie nenhuma frase literalmente. Não acrescente nem retire
+informações. Preserve literalmente todos os números e a classificação final.
+Na explicação, diga primeiro qual foi o resultado e depois por quê, sem repetir
+o título da notícia. Retorne somente o objeto JSON solicitado.
 
 DADOS IMUTÁVEIS:
 {context_json}

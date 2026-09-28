@@ -45,6 +45,7 @@ class ExplanationRewriterTests(unittest.TestCase):
         self.assertIn("classificacao_final_obrigatoria", prompt)
         self.assertIn("evidência insuficiente", prompt)
         self.assertIn("8 receberam confirmação", prompt)
+        self.assertIn("Não copie nenhuma frase literalmente", prompt)
         self.assertNotIn("fonte que não deve ir ao prompt", prompt)
         self.assertNotIn("fato que não deve ir ao prompt", prompt)
 
@@ -106,6 +107,20 @@ class ExplanationRewriterTests(unittest.TestCase):
         self.assertEqual(report["source"], "deterministic")
         self.assertEqual(report["explanation"], expected["explanation"])
         self.assertEqual(report["details"], expected["details"])
+
+    def test_literal_copy_is_not_attributed_to_qwen(self):
+        result = sample_result()
+        base = ExplanationGenerator.fallback_report(result)
+
+        with patch(
+            "pipeline.output.explanation_generator.requests.post",
+            return_value=ollama_response(base),
+        ):
+            report = ExplanationGenerator.generate(result)
+
+        self.assertEqual(report["source"], "deterministic")
+        self.assertEqual(report["explanation"], base["explanation"])
+        self.assertEqual(report["details"], base["details"])
 
     def test_hybrid_requires_some_accepted_qwen_text(self):
         result = sample_result()

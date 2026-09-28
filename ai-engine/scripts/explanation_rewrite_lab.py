@@ -187,7 +187,7 @@ def main() -> None:
         "think": False,
         "format": ExplanationGenerator.OUTPUT_SCHEMA,
         "options": {
-            "temperature": 0.1,
+            "temperature": 0.2,
             "top_p": 0.8,
             "top_k": 20,
             "num_ctx": 4096,
@@ -211,8 +211,8 @@ def main() -> None:
     ).strip()
 
     print("MODELO:", model)
-    print("ORIGEM: qwen bruto (sem validacao da HIBRIA)")
-    print("\nRESPOSTA BRUTA:")
+    print("ETAPA: resposta do Qwen antes da validacao da HIBRIA")
+    print("\nRESPOSTA DO QWEN:")
     print(raw_content)
 
     report = ExplanationGenerator._parse_report(raw_content)
