@@ -35,7 +35,7 @@ class ExplanationGenerator:
     DEFAULT_API_URL = "http://127.0.0.1:11434/api/chat"
     DEFAULT_MODEL = "qwen3:1.7b"
     DEFAULT_TIMEOUT = 120
-    MAX_INPUT_CHARS = 4200
+    MAX_INPUT_CHARS = 8000
     RELATION_LABELS = {
         "confirmed": "recebeu confirmação nas verificações",
         "divergent": "apresentou informações diferentes nas verificações",
@@ -250,46 +250,32 @@ class ExplanationGenerator:
 /no_think
 
 Você é somente o redator final de uma verificação de notícia. A classificação,
-as contagens e o resultado de cada verificação já foram calculados. Não refaça
-a análise e não decida se a notícia é verdadeira ou falsa.
+as contagens e os fatores da nota já foram calculados. Você apenas transforma
+esses dados em uma explicação clara. Não refaça a análise.
 
-Use exclusivamente a ficha recebida. Ela contém um assunto, um resumo numérico,
-o alcance da verificação e até três informações concretas da notícia. Não use
-conhecimento próprio e não acrescente fatos, pessoas, datas, números, pesquisas,
-fontes ou conclusões que não estejam nessa ficha.
-
-A interface já mostra a classificação em destaque. Explique os motivos sem
-repetir a classificação. Se for indispensável citá-la, faça isso uma única vez
-em toda a resposta.
+Leia todas as informações verificadas para entender o assunto, mas NÃO as cite,
+enumere ou junte em uma frase. Faça uma síntese geral do que as verificações
+mostraram e de por que o resultado foi atribuído.
 
 Escreva para uma pessoa leiga:
-- "explanation": uma ou duas frases que mencionem ao menos uma informação
-  concreta da ficha e expliquem, de forma direta, o que foi possível verificar.
-- primeiro detalhe: explique uma informação concreta e o resultado de sua
-  verificação; não escreva "primeira afirmação" ou "claim".
-- segundo detalhe: apresente exatamente as contagens numéricas recebidas e diga
-  quanto do conteúdo importante pôde ser verificado.
-- terceiro detalhe: explique como isso afetou a nota e inclua o cuidado de que
-  falta de confirmação, sozinha, não prova que uma notícia seja falsa.
+- "explanation": duas frases naturais sobre o resultado geral da análise, sem
+  números e sem recontar uma informação específica da notícia.
+- detalhe 1: informe corretamente quantas confirmações, diferenças e casos sem
+  confirmação direta ocorreram.
+- detalhe 2: explique quanto do conteúdo pôde ser verificado e qual foi o motivo
+  determinante da classificação.
+- detalhe 3: explique como isso afetou a nota e como o resultado deve ser
+  interpretado, sem declarar que a notícia é verdadeira ou falsa.
 
-Regras obrigatórias:
-- Preserve exatamente todos os algarismos que usar e a classificação calculada.
-- Não invente ligação entre duas informações da ficha.
-- Não diga que algo foi confirmado se o status recebido indicar diferença,
-  resultado misto ou ausência de confirmação.
-- Não cite nomes de sites, veículos ou fontes.
-- Não use "apoio externo", "evidência externa", "cobertura", "comparações",
-  "claim", "pipeline", "stance", "score", "modelo", "classificador",
-  "BERTimbau", "similaridade", "polaridade" ou "base de dados".
-- Não escreva "a HÍBRIA encontrou", "a HÍBRIA classificou" ou "a HÍBRIA
-  atribuiu". Use "as verificações" ou uma construção impessoal.
-- Não repita a mesma ideia ou a mesma frase.
-- Não copie o título completo da notícia.
-- Não use Markdown, numeração ou marcadores nos textos.
-- Termine a explicação e cada detalhe com pontuação.
+Não troque "diferença" por "sem confirmação": são resultados distintos.
+Não use as palavras "afirmação", "claim", "cobertura", "comparações", "score",
+"pipeline", "modelo", "classificador", "BERTimbau" ou "similaridade".
+Não cite sites ou fontes. Não diga "a HÍBRIA encontrou". Não repita a
+classificação mais de uma vez em toda a resposta. Não repita ideias entre os
+quatro textos. Use português do Brasil, frases completas e pontuação final.
 
-Retorne somente o JSON do schema. A explicação deve ter no máximo 300
-caracteres e cada um dos três detalhes, no máximo 260 caracteres.
+Não invente fatos ou números. Retorne somente o JSON do schema, com no máximo
+300 caracteres na explicação e 260 em cada um dos três detalhes.
 """.strip()
 
     @classmethod
@@ -329,7 +315,7 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
 
     @classmethod
     def _build_context(cls, result: Any) -> dict[str, Any]:
-        """Monta a ficha factual mínima que o Qwen pode apenas redigir."""
+        """Monta a ficha completa, mas sem páginas ou fontes externas brutas."""
         breakdown = getattr(result, "score_breakdown", None) or {}
         stance = breakdown.get("stance_stats") or {}
         counts = {
@@ -337,6 +323,16 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
             "diferencas": int(stance.get("contradict", 0) or 0),
             "sem_confirmacao_direta": int(stance.get("neutral", 0) or 0)
             + int(stance.get("insufficient", 0) or 0),
+        }
+
+        factors = {
+            "indice_final": getattr(result, "score_final", None),
+            "forca_das_evidencias": breakdown.get("evidence_score"),
+            "parte_do_conteudo_com_evidencia_valida": breakdown.get(
+                "coverage_score"
+            ),
+            "reputacao_da_fonte": breakdown.get("reputation_score"),
+            "sinal_textual_auxiliar": breakdown.get("bertimbau_score"),
         }
 
         return {
@@ -348,6 +344,8 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
                 180,
             ),
             "resumo_numerico": counts,
+            "fatores_que_formaram_a_nota": factors,
+            "motivo_determinante": cls._decision_reason(result),
             "quanto_do_conteudo_importante_foi_verificado": (
                 cls._coverage_plain_description(
                     breakdown.get("coverage_score")
@@ -362,6 +360,62 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
                 "seja falsa."
             ),
         }
+
+    @classmethod
+    def _decision_reason(cls, result: Any) -> str:
+        """Explica a regra decisiva sem pedir ao Qwen que a deduza."""
+        breakdown = getattr(result, "score_breakdown", None) or {}
+        label = str(getattr(result, "label_final", None) or "").casefold()
+        stance = breakdown.get("stance_stats") or {}
+
+        try:
+            coverage = float(breakdown.get("coverage_score") or 0.0)
+            if coverage > 1:
+                coverage /= 100.0
+        except (TypeError, ValueError):
+            coverage = 0.0
+
+        try:
+            contradiction_rate = float(
+                stance.get("contradiction_rate") or 0.0
+            )
+        except (TypeError, ValueError):
+            contradiction_rate = 0.0
+
+        min_partial = float(
+            breakdown.get("min_coverage_for_partial") or 0.20
+        )
+        min_unreliable = float(
+            breakdown.get("min_contradiction_rate_for_unreliable") or 0.40
+        )
+
+        if label == "não confiável" and contradiction_rate >= min_unreliable:
+            return (
+                "A quantidade proporcional de diferenças atingiu o limite "
+                "usado para reduzir a classificação."
+            )
+        if label in {"evidência insuficiente", "não verificado"}:
+            if coverage == 0:
+                return (
+                    "Não houve evidência válida suficiente para verificar os "
+                    "pontos principais da notícia."
+                )
+            if coverage < min_partial:
+                return (
+                    "A pequena parte do conteúdo com evidência válida foi o "
+                    "principal motivo da classificação."
+                )
+        if label == "confiável":
+            return (
+                "A quantidade de confirmações, o alcance da verificação e a "
+                "nota conjunta atenderam aos critérios da classificação."
+            )
+        if label == "parcialmente confiável":
+            return (
+                "As verificações sustentaram parte do conteúdo, mas não em "
+                "quantidade suficiente para a classificação mais alta."
+            )
+        return "O conjunto dos fatores disponíveis determinou a classificação."
 
     @classmethod
     def _build_verification_points(
@@ -428,31 +482,9 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
                 }
             )
 
-        if not points:
-            return []
-
-        # Mantém a primeira informação (normalmente a mais relevante) e tenta
-        # incluir um resultado diferente para explicar situações mistas.
-        selected = [points[0]]
-        first_status = points[0]["tipo_resultado"]
-        different = next(
-            (
-                point
-                for point in points[1:]
-                if point["tipo_resultado"] != first_status
-            ),
-            None,
-        )
-        if different is not None:
-            selected.append(different)
-
-        for point in points[1:]:
-            if len(selected) >= 3:
-                break
-            if point not in selected:
-                selected.append(point)
-
-        return selected[:3]
+        # O pipeline limita normalmente a análise a dez informações. Todas são
+        # enviadas para que o modelo compreenda o conjunto, não para enumerá-las.
+        return points[:10]
 
     @classmethod
     def _deterministic_details(
@@ -467,29 +499,6 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
         supports = int(counts.get("confirmacoes", 0) or 0)
         contradictions = int(counts.get("diferencas", 0) or 0)
         unconfirmed = int(counts.get("sem_confirmacao_direta", 0) or 0)
-
-        points = list(safe_context.get("verificacoes_relevantes") or [])
-        if points:
-            point = points[0]
-            information = cls._truncate_text(
-                point.get("informacao_da_noticia"),
-                145,
-            ).rstrip("… .!?;:")
-            status = str(point.get("resultado_calculado") or "")
-            first_detail = cls._limit_output_text(
-                f'Ao verificar “{information}”, essa informação {status}.',
-                260,
-            )
-        elif supports or contradictions:
-            first_detail = (
-                "As verificações apresentaram confirmações e diferenças nas "
-                "informações da notícia."
-            )
-        else:
-            first_detail = (
-                "Não foi possível confirmar diretamente as informações "
-                "principais da notícia."
-            )
 
         count_parts: list[str] = []
         if supports:
@@ -510,16 +519,25 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
                 f"{cls._plural(unconfirmed, 'ficou', 'ficaram')} sem confirmação direta"
             )
 
+        if count_parts:
+            first_detail = f"Nas verificações, {', '.join(count_parts)}."
+        else:
+            first_detail = (
+                "Não foi possível confirmar diretamente as informações "
+                "principais da notícia."
+            )
+
         reach = str(
             safe_context.get("quanto_do_conteudo_importante_foi_verificado")
             or "não foi possível medir quanto do conteúdo pôde ser verificado"
         )
-        if count_parts:
-            second_detail = (
-                f"No conjunto, {', '.join(count_parts)}; {reach}."
-            )
-        else:
-            second_detail = reach[:1].upper() + reach[1:] + "."
+        reason = str(
+            safe_context.get("motivo_determinante")
+            or "O conjunto dos fatores disponíveis determinou a classificação."
+        )
+        second_detail = (
+            f"{reach[:1].upper() + reach[1:]}. {reason}"
+        )
 
         label = str(getattr(result, "label_final", None) or "").casefold()
         if label in {"evidência insuficiente", "não verificado"}:
@@ -569,16 +587,7 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
         coverage = cls._coverage_description(breakdown.get("coverage_score"))
         label = str(getattr(result, "label_final", None) or "não verificado")
 
-        points = list(safe_context.get("verificacoes_relevantes") or [])
-        if points:
-            point = points[0]
-            information = cls._truncate_text(
-                point.get("informacao_da_noticia"),
-                125,
-            ).rstrip("… .!?;:")
-            status = str(point.get("resultado_calculado") or "")
-            finding = f'Ao verificar “{information}”, a informação {status}'
-        elif supports and contradictions:
+        if supports and contradictions:
             finding = (
                 "Algumas informações foram confirmadas, enquanto outras não "
                 "coincidiram com o que foi encontrado"
@@ -637,6 +646,10 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
             "apoio externo",
             "evidências externas",
             "claim",
+            "afirmação",
+            "afirmações",
+            "afirmacao",
+            "afirmacoes",
             "primeira afirmação",
             "segunda afirmação",
             "terceira afirmação",
@@ -732,21 +745,20 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
             return False
         if cls._label_occurrences(text, label) > 1:
             return False
+        if cls._number_tokens(text):
+            return False
         if not cls._numbers_are_allowed(text, context):
             return False
 
         points = list(context.get("verificacoes_relevantes") or [])
-        subject = str(context.get("assunto_da_noticia") or "")
-        if points:
-            factual_overlap = max(
-                cls._text_overlap(
-                    text,
-                    str(point.get("informacao_da_noticia") or ""),
-                )
-                for point in points
-            )
-            if factual_overlap < 0.16 and cls._text_overlap(text, subject) < 0.20:
-                return False
+        if any(
+            cls._text_overlap(
+                text,
+                str(point.get("informacao_da_noticia") or ""),
+            ) >= 0.55
+            for point in points
+        ):
+            return False
 
         return True
 
@@ -778,15 +790,7 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
         required = cls._required_count_tokens(context)
         if not required.issubset(set(cls._number_tokens(combined))):
             return False
-
-        points = list(context.get("verificacoes_relevantes") or [])
-        if points and max(
-            cls._text_overlap(
-                normalized[0],
-                str(point.get("informacao_da_noticia") or ""),
-            )
-            for point in points
-        ) < 0.16:
+        if not cls._counts_keep_their_meaning(normalized[0], context):
             return False
 
         consequence_terms = (
@@ -801,6 +805,56 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
             for term in consequence_terms
         ):
             return False
+        if re.search(
+            r"(?:classifica(?:ção|cao)|resultado).{0,80}(?:porque|pois)"
+            r".{0,100}não (?:prova|significa).{0,80}fals",
+            normalized[2].casefold(),
+        ):
+            return False
+        return True
+
+    @classmethod
+    def _counts_keep_their_meaning(
+        cls,
+        text: str,
+        context: dict[str, Any],
+    ) -> bool:
+        counts = context.get("resumo_numerico") or {}
+        expected_terms = {
+            "confirmacoes": ("confirm",),
+            "diferencas": ("diferen", "diverg"),
+            "sem_confirmacao_direta": (
+                "sem confirmação",
+                "sem confirmacao",
+                "não receberam confirmação",
+                "nao receberam confirmacao",
+                "não tiveram confirmação",
+                "nao tiveram confirmacao",
+                "não foram confirm",
+                "nao foram confirm",
+            ),
+        }
+        normalized = " ".join(str(text or "").casefold().split())
+
+        for key, terms in expected_terms.items():
+            amount = int(counts.get(key, 0) or 0)
+            if amount <= 0:
+                continue
+            matches = list(
+                re.finditer(rf"(?<!\w){amount}(?!\w)", normalized)
+            )
+            if not matches:
+                return False
+            if not any(
+                any(
+                    term in normalized[
+                        max(0, match.start() - 25) : match.end() + 80
+                    ]
+                    for term in terms
+                )
+                for match in matches
+            ):
+                return False
         return True
 
     @classmethod
@@ -958,13 +1012,14 @@ caracteres e cada um dos três detalhes, no máximo 260 caracteres.
         return f"""
 /no_think
 
-Redija a explicação usando somente a ficha abaixo. A classificação já aparece
-na interface: não a repita para preencher espaço. Use uma informação concreta
-em vez de frases vagas como "o resultado foi calculado".
+Use somente a ficha abaixo. Considere todas as verificações para entender o
+conjunto, mas sintetize o resultado sem citar ou enumerar cada informação da
+notícia. Não copie o título.
 
-O segundo detalhe deve manter em algarismos todas as contagens maiores que zero
-do campo "resumo_numerico". Não use marcadores ou numeração. Retorne somente o
-objeto JSON solicitado.
+O primeiro detalhe deve manter em algarismos todas as contagens maiores que
+zero de "resumo_numerico" e usar cada uma com seu significado correto. Use
+"motivo_determinante" para explicar a decisão no segundo detalhe. Retorne
+somente o objeto JSON solicitado, sem marcadores ou numeração.
 
 FICHA VALIDADA:
 {context_json}
@@ -1111,6 +1166,20 @@ FICHA VALIDADA:
     def _normalize_model_text(value: Any) -> str:
         """Normaliza espaços e pequenos erros recorrentes do modelo local."""
         text = " ".join(str(value or "").split())
+        substitutions = (
+            (r"\bconfirmacoes\b", "confirmações"),
+            (r"\bdiferencas\b", "diferenças"),
+            (r"\bevidencias\b", "evidências"),
+            (r"\bempatados? técnico\b", "tecnicamente empatados"),
+            (r"\bempatadas? técnico\b", "tecnicamente empatadas"),
+        )
+        for pattern, replacement in substitutions:
+            text = re.sub(
+                pattern,
+                replacement,
+                text,
+                flags=re.IGNORECASE,
+            )
         text = re.sub(
             r"\bA\s+H[IÍ](?:BRIA|BIRA|BRA)\b",
             "A análise",

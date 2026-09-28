@@ -68,16 +68,15 @@ def sample_result() -> SimpleNamespace:
 def valid_model_report() -> dict:
     return {
         "explanation": (
-            "A liderança em três estados recebeu confirmação, enquanto o "
-            "empate técnico apresentou diferenças nas verificações. Poucas "
-            "informações importantes puderam ser verificadas."
+            "As verificações da pesquisa eleitoral trouxeram confirmações, "
+            "diferenças e pontos sem confirmação direta. Apenas uma pequena "
+            "parte do conteúdo importante pôde ser verificada."
         ),
         "details": [
-            "A liderança de Lula em três estados recebeu confirmação; o "
-            "empate técnico apresentou informações diferentes nas verificações.",
-            "No conjunto, 8 trechos foram confirmados, 3 apresentaram "
-            "diferenças e 6 ficaram sem confirmação direta; somente uma "
-            "pequena parte do conteúdo importante pôde ser verificada.",
+            "Nas verificações, 8 resultados receberam confirmação, 3 "
+            "apresentaram diferenças e 6 ficaram sem confirmação direta.",
+            "Somente uma pequena parte do conteúdo importante pôde ser "
+            "verificada, e esse alcance limitado foi o principal motivo da decisão.",
             "A falta de confirmação do restante reduziu a nota. Isso não "
             "significa, por si só, que a notícia seja falsa.",
         ],
@@ -94,7 +93,7 @@ def ollama_response(report: dict) -> MagicMock:
     return response
 
 
-class ExplanationV3Tests(unittest.TestCase):
+class ExplanationV4Tests(unittest.TestCase):
     def test_context_contains_concrete_results_without_external_sources(self):
         context = ExplanationGenerator._build_context(sample_result())
         serialized = json.dumps(context, ensure_ascii=False)
@@ -116,6 +115,37 @@ class ExplanationV3Tests(unittest.TestCase):
         self.assertIn("verificacoes_relevantes", prompt)
         self.assertIn("resumo_numerico", prompt)
         self.assertLessEqual(len(prompt), ExplanationGenerator.MAX_INPUT_CHARS)
+
+    def test_context_keeps_all_available_verification_points(self):
+        result = sample_result()
+        for index in range(3, 9):
+            claim_id = f"claim-{index}"
+            evidence_id = f"evidence-{index}"
+            result.retrieval_results.append(
+                SimpleNamespace(
+                    claim=SimpleNamespace(
+                        claim_id=claim_id,
+                        text=f"Informação verificável número {index} da notícia.",
+                    ),
+                    evidences=[
+                        SimpleNamespace(
+                            evidence_id=evidence_id,
+                            stance="support",
+                        )
+                    ],
+                )
+            )
+            result.stance_results.append(
+                {
+                    "claim_id": claim_id,
+                    "evidence_id": evidence_id,
+                    "stance": "support",
+                }
+            )
+
+        context = ExplanationGenerator._build_context(result)
+
+        self.assertEqual(len(context["verificacoes_relevantes"]), 8)
 
     def test_valid_specific_report_is_accepted_as_qwen(self):
         with patch(
@@ -153,9 +183,31 @@ class ExplanationV3Tests(unittest.TestCase):
 
     def test_invented_number_rejects_details(self):
         model_report = valid_model_report()
-        model_report["details"][1] = (
-            "No conjunto, 9 trechos foram confirmados, 3 apresentaram "
-            "diferenças e 6 ficaram sem confirmação direta."
+        model_report["details"][0] = (
+            "Nas verificações, 9 resultados receberam confirmação, 3 "
+            "apresentaram diferenças e 6 ficaram sem confirmação direta."
+        )
+        context = ExplanationGenerator._build_context(sample_result())
+        fallback = ExplanationGenerator._fallback_report_from_context(
+            sample_result(),
+            context,
+        )
+
+        checked = ExplanationGenerator._validate_model_report(
+            model_report,
+            result=sample_result(),
+            context=context,
+            fallback=fallback,
+        )
+
+        self.assertEqual(checked["source"], "hybrid")
+        self.assertEqual(checked["details"], fallback["details"])
+
+    def test_difference_count_cannot_be_called_unconfirmed(self):
+        model_report = valid_model_report()
+        model_report["details"][0] = (
+            "Nas verificações, 8 resultados receberam confirmação, 3 não "
+            "foram confirmados e 6 ficaram sem confirmação direta."
         )
         context = ExplanationGenerator._build_context(sample_result())
         fallback = ExplanationGenerator._fallback_report_from_context(

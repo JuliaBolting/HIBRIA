@@ -200,7 +200,7 @@ class StanceRegressionTests(unittest.TestCase):
         prompt = ExplanationGenerator._system_prompt()
 
         self.assertIn("pessoa leiga", prompt)
-        self.assertIn("Não cite nomes de sites", prompt)
+        self.assertIn("Não cite sites ou fontes", prompt)
         self.assertIn('"claim"', prompt)
 
     def test_prompt_excerpt_does_not_end_in_middle_of_word(self):
@@ -327,9 +327,9 @@ class StanceRegressionTests(unittest.TestCase):
         details = ExplanationGenerator._deterministic_details(result)
 
         self.assertEqual(len(details), 3)
-        self.assertIn("2 trechos receberam confirmação", details[1])
-        self.assertIn("1 ficou sem confirmação direta", details[1])
-        self.assertIn("somente uma pequena parte", details[1])
+        self.assertIn("2 trechos receberam confirmação", details[0])
+        self.assertIn("1 ficou sem confirmação direta", details[0])
+        self.assertIn("Somente uma pequena parte", details[1])
         self.assertIn("reduziu a nota", details[2])
         self.assertIn("não significa", details[2])
         self.assertTrue(all("HÍBRIA" not in item for item in details))
@@ -382,12 +382,13 @@ class StanceRegressionTests(unittest.TestCase):
     def test_generate_preserves_valid_qwen_details(self):
         model_report = {
             "explanation": (
-                "Os dados da pesquisa receberam algumas confirmações, enquanto "
-                "outras informações não puderam ser verificadas."
+                "As verificações da pesquisa trouxeram confirmações, diferenças "
+                "e pontos sem confirmação direta. Apenas uma pequena parte do "
+                "conteúdo importante pôde ser verificada."
             ),
             "details": [
-                "Oito trechos receberam confirmação e três apresentaram informações diferentes.",
-                "No conjunto, 8 trechos receberam confirmação, 3 apresentaram diferenças e 2 ficaram sem confirmação direta; somente uma pequena parte dos dados importantes pôde ser verificada.",
+                "Nas verificações, 8 resultados receberam confirmação, 3 apresentaram diferenças e 2 ficaram sem confirmação direta.",
+                "Somente uma pequena parte dos dados importantes pôde ser verificada, e esse alcance limitado determinou a decisão.",
                 "A falta de verificação do restante reduziu a nota. Isso não significa, por si só, que a notícia seja falsa.",
             ],
         }

@@ -22,7 +22,7 @@ from pipeline.output.explanation_generator import ExplanationGenerator
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Testa a explicacao v3 com uma analise salva, sem pesquisar "
+            "Testa a explicacao v4 com uma analise salva, sem pesquisar "
             "novamente e sem alterar o banco."
         )
     )
