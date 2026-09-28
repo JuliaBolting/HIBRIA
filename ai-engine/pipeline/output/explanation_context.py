@@ -15,7 +15,7 @@ import unicodedata
 from types import SimpleNamespace
 from typing import Any
 
-VERSION = "explanation-6.0.0"
+VERSION = "explanation-7.0.0"
 
 
 def value(obj: Any, key: str, default=None):
@@ -203,6 +203,143 @@ def compact_context(context: dict, max_chars: int) -> dict:
         if len(json.dumps(compact, ensure_ascii=False, separators=(",", ":"))) <= max_chars:
             return compact
     raise ValueError("Contexto decisório excede o limite configurado; dados não foram cortados silenciosamente.")
+
+
+def _item_reading(item: dict) -> str:
+    """Traduz sinais internos sem promovê-los a fatos confirmados."""
+    signals = {
+        norm(ref.get("sinal_automatico"))
+        for ref in item.get("referencias", [])
+        if ref.get("sinal_automatico")
+    }
+    signals.update(
+        norm(record.get("stance"))
+        for record in item.get("registros_automaticos", [])
+        if record.get("stance")
+    )
+    has_support = "support" in signals
+    has_difference = "contradict" in signals
+    if has_support and has_difference:
+        return "As comparações automáticas apontaram concordâncias e também diferenças; este ponto ficou parcialmente esclarecido."
+    if has_support:
+        return "As comparações automáticas encontraram material que aponta na mesma direção, sem transformar essa relação em prova do acontecimento."
+    if has_difference:
+        return "As comparações automáticas apontaram diferenças em relação aos materiais encontrados; elas podem envolver contexto, data ou formulação."
+    if item.get("referencias"):
+        return "Foram encontrados materiais relacionados ao tema, mas eles não deram apoio direto suficiente a este ponto."
+    return "Não foi encontrada referência suficiente para avaliar este ponto."
+
+
+def _ordered_items(items: list[dict]) -> list[dict]:
+    """Espalha casos favoráveis, divergentes e inconclusivos pelo recorte."""
+    groups = {"mixed": [], "support": [], "difference": [], "open": []}
+    for item in items:
+        signals = {
+            norm(ref.get("sinal_automatico"))
+            for ref in item.get("referencias", [])
+            if ref.get("sinal_automatico")
+        }
+        signals.update(
+            norm(record.get("stance"))
+            for record in item.get("registros_automaticos", [])
+            if record.get("stance")
+        )
+        key = ("mixed" if {"support", "contradict"} <= signals else
+               "support" if "support" in signals else
+               "difference" if "contradict" in signals else "open")
+        groups[key].append(item)
+    ordered = []
+    while any(groups.values()):
+        for key in ("support", "difference", "mixed", "open"):
+            if groups[key]:
+                ordered.append(groups[key].pop(0))
+    return ordered
+
+
+def build_model_context(context: dict, max_chars: int) -> tuple[dict, dict]:
+    """Cria uma ficha editorial; campos de diagnóstico não chegam ao modelo.
+
+    O modelo recebe conteúdo suficiente para escrever sobre o caso concreto, mas
+    não recebe contagens de recorte, nomes de campos internos ou estados de
+    confiança que poderiam ser confundidos com julgamentos sobre uma fonte.
+    """
+    decision = context["decisao"]
+    reason_text = {
+        "criterios_para_confiavel_atendidos": "Os materiais aceitos e os sinais de apoio atenderam aos critérios da classificação.",
+        "criterios_atendidos_parcialmente": "Houve elementos favoráveis, mas nem todos os critérios da classificação mais alta foram atendidos.",
+        "sinais_de_contradicao": "As diferenças apontadas nas comparações atingiram o limite usado para esta classificação.",
+        "nenhum_item_aceito_no_calculo": "Nenhum material passou por todos os critérios necessários para sustentar a avaliação.",
+        "poucos_itens_aceitos_no_calculo": "Poucos materiais passaram por todos os critérios necessários para sustentar o conteúdo principal.",
+        "resultado_inconclusivo": "O conjunto disponível não ofereceu base suficiente para uma conclusão mais segura.",
+        "motivo_nao_documentado": "Os dados preservados não registram um único motivo determinante para a classificação.",
+    }.get(decision.get("motivo"), "O conjunto disponível não ofereceu base suficiente para uma conclusão mais segura.")
+
+    article = context.get("noticia") or {}
+    reputation = context.get("sinais", {}).get("origem", {}).get("nota")
+    textual = context.get("sinais", {}).get("texto", {}).get("nota")
+    if reputation is not None and reputation >= 80:
+        auxiliary = "A boa reputação do veículo ajudou na nota, mas não confirma sozinha as informações da notícia."
+    elif reputation is not None and reputation < 50:
+        auxiliary = "A avaliação baixa da reputação do veículo limitou esse componente da nota, sem provar que a notícia seja falsa."
+    elif reputation is not None:
+        auxiliary = "A reputação do veículo participou da nota, mas não confirma sozinha as informações da notícia."
+    elif textual is not None and textual >= 80:
+        auxiliary = "Os padrões de escrita ajudaram na nota, mas não confirmam os acontecimentos relatados."
+    elif textual is not None:
+        auxiliary = "Os padrões de escrita participaram da nota apenas como sinal auxiliar."
+    else:
+        auxiliary = "Não havia um fator auxiliar disponível que pudesse aumentar a segurança da conclusão."
+    ordered = _ordered_items(context.get("itens") or [])
+    diagnostics = {
+        "itens_disponiveis": len(ordered),
+        "referencias_disponiveis": sum(len(item.get("referencias", [])) for item in ordered),
+        "observacao": "O recorte é apenas técnico e não significa que materiais foram rejeitados pela análise.",
+    }
+
+    # Tenta primeiro uma ficha rica; reduz trechos, referências e itens de forma
+    # distribuída se o contexto configurado for menor.
+    for article_size, claim_size, ref_size, refs_per_item, item_cap in (
+        (1200, 220, 220, 2, 12),
+        (800, 190, 160, 1, 10),
+        (450, 170, 100, 1, 8),
+        (240, 150, 0, 0, 8),
+        (0, 130, 0, 0, 6),
+    ):
+        selected = ordered[:item_cap]
+        points = []
+        for item in selected:
+            point = {
+                "parte_da_noticia": excerpt(item.get("texto_selecionado", ""), claim_size),
+                "leitura_cautelosa": _item_reading(item),
+            }
+            if refs_per_item:
+                snippets = [excerpt(ref.get("texto", ""), ref_size)
+                            for ref in item.get("referencias", []) if plain(ref.get("texto"))]
+                if snippets:
+                    point["trechos_relacionados"] = snippets[:refs_per_item]
+            points.append(point)
+        brief = {
+            "resultado_que_deve_ser_explicado": decision.get("rotulo"),
+            "motivo_principal": reason_text,
+            "fator_auxiliar_da_nota": auxiliary,
+            "assunto": excerpt(article.get("titulo", ""), 220),
+            "contexto_da_noticia": excerpt(article.get("texto", ""), article_size) if article_size else "",
+            "pontos_avaliados": points,
+            "limites_da_conclusao": [
+                "Uma comparação automática pode apontar relação ou diferença sem comprovar o acontecimento.",
+                "Não encontrar apoio suficiente deixa o ponto em aberto; não prova que a notícia seja falsa.",
+                "A reputação do veículo e os padrões de escrita são sinais auxiliares, não provas dos fatos.",
+            ],
+        }
+        encoded = json.dumps(brief, ensure_ascii=False, separators=(",", ":"))
+        if len(encoded) <= max_chars:
+            diagnostics.update({
+                "itens_enviados": len(points),
+                "referencias_textuais_enviadas": sum(len(p.get("trechos_relacionados", [])) for p in points),
+                "caracteres_enviados": len(encoded),
+            })
+            return brief, diagnostics
+    raise ValueError("A ficha editorial excede o limite configurado.")
 
 
 def restore_result(payload: dict, content: str = "") -> SimpleNamespace:

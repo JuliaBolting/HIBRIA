@@ -113,9 +113,10 @@ def main():
     trace = {}
     if args.no_model:
         context = ExplanationGenerator._build_context(result)
-        request, sent = ExplanationGenerator._request_payload(result, context)
+        request, sent, diagnostics = ExplanationGenerator._request_payload(result, context)
         final = ExplanationGenerator.fallback_report(result)
-        trace.update(full_context=context, sent_context=sent, request_preview=request, final=final,
+        trace.update(full_context=context, sent_context=sent, input_diagnostics=diagnostics,
+                     request_preview=request, final=final,
                      mode="offline_sem_modelo")
     else:
         final = ExplanationGenerator.generate(result, trace=trace)
@@ -125,7 +126,7 @@ def main():
     html_path.write_text(make_html(result.title, payload, final), encoding="utf-8")
     print("VERSÃO:", ExplanationGenerator.VERSION)
     print("MODELO CONFIGURADO:", os.getenv("HIBRIA_QWEN_MODEL") or ExplanationGenerator.DEFAULT_MODEL)
-    print("RECORTE ENVIADO:", trace.get("sent_context", {}).get("recorte"))
+    print("ENTRADA DO MODELO:", trace.get("input_diagnostics"))
     if args.show_prompt:
         print(json.dumps((trace.get("attempts") or [{}])[0].get("payload") or trace.get("request_preview"), ensure_ascii=False, indent=2))
     for i, attempt in enumerate(trace.get("attempts", []), 1):
