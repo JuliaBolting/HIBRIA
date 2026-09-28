@@ -147,7 +147,7 @@ class StanceRegressionTests(unittest.TestCase):
 
         self.assertEqual(result.stance, "contradict")
 
-    def test_explanation_prompt_pairs_claim_source_and_evidence(self):
+    def test_explanation_prompt_uses_safe_verification_summary(self):
         claim = self.claim("Cauã Reymond foi anunciado para a segunda temporada.")
         evidence = self.evidence(
             "Cauã Reymond foi confirmado na segunda temporada da série."
@@ -187,20 +187,21 @@ class StanceRegressionTests(unittest.TestCase):
 
         prompt = ExplanationGenerator._build_prompt(result)
 
-        self.assertIn("verificacoes_realizadas", prompt)
-        self.assertIn("fonte.test", prompt)
+        self.assertIn("verificacoes_relevantes", prompt)
+        self.assertNotIn("fonte.test", prompt)
         self.assertIn("informacao_da_noticia", prompt)
-        self.assertIn("resultado_da_verificacao", prompt)
-        self.assertIn("fatores_que_formaram_o_resultado", prompt)
-        self.assertIn("foram encontrados apoios", prompt)
+        self.assertIn("resultado_calculado", prompt)
+        self.assertIn("resumo_numerico", prompt)
+        self.assertIn("recebeu confirmação nas verificações", prompt)
+        self.assertNotIn("Cauã Reymond foi confirmado na segunda temporada", prompt)
         self.assertNotIn("diferença relevante de polaridade textual", prompt)
 
     def test_system_prompt_explains_result_without_numbered_claims(self):
         prompt = ExplanationGenerator._system_prompt()
 
-        self.assertIn("pessoa sem conhecimento técnico", prompt)
-        self.assertIn("Evite nomes de veículos", prompt)
-        self.assertIn("Não use termos internos: claim", prompt)
+        self.assertIn("pessoa leiga", prompt)
+        self.assertIn("Não cite nomes de sites", prompt)
+        self.assertIn('"claim"', prompt)
 
     def test_prompt_excerpt_does_not_end_in_middle_of_word(self):
         excerpt = (
@@ -326,10 +327,11 @@ class StanceRegressionTests(unittest.TestCase):
         details = ExplanationGenerator._deterministic_details(result)
 
         self.assertEqual(len(details), 3)
-        self.assertIn("2 receberam confirmação", details[0])
-        self.assertIn("sem diferenças importantes", details[0])
-        self.assertIn("apenas uma pequena parte", details[1])
-        self.assertIn('resultado "evidência insuficiente"', details[2])
+        self.assertIn("2 trechos receberam confirmação", details[1])
+        self.assertIn("1 ficou sem confirmação direta", details[1])
+        self.assertIn("somente uma pequena parte", details[1])
+        self.assertIn("reduziu a nota", details[2])
+        self.assertIn("não significa", details[2])
         self.assertTrue(all("HÍBRIA" not in item for item in details))
         self.assertTrue(all("cobertura" not in item.casefold() for item in details))
         self.assertTrue(all("comparações" not in item.casefold() for item in details))
@@ -371,10 +373,10 @@ class StanceRegressionTests(unittest.TestCase):
 
         explanation = ExplanationGenerator._deterministic_explanation(result)
 
-        self.assertIn("algumas informações foram confirmadas", explanation)
+        self.assertIn("Algumas informações foram confirmadas", explanation)
         self.assertIn("poucas partes da notícia", explanation)
-        self.assertIn('resultado foi "evidência insuficiente"', explanation)
-        self.assertIn("não significa que a notícia seja falsa", explanation)
+        self.assertIn("não foi suficiente para sustentar", explanation)
+        self.assertNotIn("evidência insuficiente", explanation)
         self.assertNotIn("cobertura", explanation.casefold())
 
     def test_generate_preserves_valid_qwen_details(self):
@@ -385,8 +387,8 @@ class StanceRegressionTests(unittest.TestCase):
             ),
             "details": [
                 "Oito trechos receberam confirmação e três apresentaram informações diferentes.",
-                "Apenas uma pequena parte dos dados importantes pôde ser verificada.",
-                "A falta de verificação do restante reduziu a nota e levou ao resultado evidência insuficiente.",
+                "No conjunto, 8 trechos receberam confirmação, 3 apresentaram diferenças e 2 ficaram sem confirmação direta; somente uma pequena parte dos dados importantes pôde ser verificada.",
+                "A falta de verificação do restante reduziu a nota. Isso não significa, por si só, que a notícia seja falsa.",
             ],
         }
         response = MagicMock(status_code=200)
