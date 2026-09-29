@@ -311,7 +311,11 @@ class TextExtractor:
     @staticmethod
     def _fetch_with_playwright(url: str) -> str:
         try:
-            from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+            from playwright.sync_api import (
+                sync_playwright,
+                TimeoutError as PWTimeout,
+                Error as PlaywrightError,
+            )
         except ImportError:
             raise ExtractionError(
                 "Playwright não instalado. Execute:\n"
@@ -320,16 +324,22 @@ class TextExtractor:
             )
 
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(
-                headless=True,
-                proxy={"server": "http://127.0.0.1:9", "bypass": "<-loopback>"},
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-                ]
-            )
+            try:
+                browser = pw.chromium.launch(
+                    headless=True,
+                    proxy={"server": "http://127.0.0.1:9", "bypass": "<-loopback>"},
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+                    ]
+                )
+            except PlaywrightError:
+                raise ExtractionError(
+                    "O navegador usado na extração não está disponível no servidor. "
+                    "Verifique a instalação do Chromium para a versão do Playwright."
+                ) from None
             context = browser.new_context(
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
