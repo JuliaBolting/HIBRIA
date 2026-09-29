@@ -1,6 +1,8 @@
+import { DEFAULT_API_URL } from '../../api-config.js';
+
 export const API_URL =
   import.meta.env.VITE_HIBRIA_API_URL ||
-  "https://hibria-tcc.duckdns.org";
+  DEFAULT_API_URL;
 
 
 async function apiRequest(path, options = {}) {

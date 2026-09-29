@@ -1,4 +1,5 @@
-const API_URL = "https://hibria-tcc.duckdns.org";
+globalThis.importScripts("api-config.js");
+const API_URL = globalThis.HIBRIA_API_URL;
 const ANALYSIS_STATE_KEY = "hibria-analysis-state-v2";
 
 
