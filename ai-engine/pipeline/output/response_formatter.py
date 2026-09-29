@@ -11,6 +11,7 @@ Responsabilidade:
 from __future__ import annotations
 
 import logging
+from pipeline.security.redaction import redact
 
 logger = logging.getLogger(__name__)
 
@@ -177,4 +178,4 @@ class ResponseFormatter:
             "[response_formatter] resposta final formatada"
         )
 
-        return response
+        return redact(response)

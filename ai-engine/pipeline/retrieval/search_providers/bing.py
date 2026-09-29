@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-import requests
+from pipeline.security import public_http as requests
 
 from .config import DEFAULT_TIMEOUT, env_flag, valid_api_key
 from .quota import ProviderQuota

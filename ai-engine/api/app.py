@@ -54,6 +54,12 @@ _rate_windows: dict[str, deque[float]] = defaultdict(deque)
 def _within_public_rate_limit(client: str) -> bool:
     now = time.monotonic()
     with _rate_lock:
+        if len(_rate_windows) > 2000:
+            for key in list(_rate_windows):
+                if not _rate_windows[key] or now - _rate_windows[key][-1] >= 60:
+                    _rate_windows.pop(key, None)
+            if len(_rate_windows) >= 10000 and client not in _rate_windows:
+                return False
         window = _rate_windows[client]
         while window and now - window[0] >= 60:
             window.popleft()
@@ -102,17 +108,26 @@ async def proteger_api(request: Request, call_next):
 
         # Consultas de andamento são frequentes e não consomem as APIs de
         # busca. O limite público é aplicado apenas quando uma análise começa.
-        if not authenticated and starts_analysis:
-            client = request.client.host if request.client else "unknown"
+        sends_feedback = request.method == "POST" and path == "/feedback"
+        if not authenticated and (starts_analysis or sends_feedback):
+            client = (request.client.host if request.client else "unknown") + (":feedback" if sends_feedback else ":analysis")
             if not _within_public_rate_limit(client):
                 return JSONResponse(
                     status_code=429,
                     content={
                         "success": False,
-                        "error": "Limite temporário de análises atingido. Tente novamente em um minuto.",
+                        "error": "Limite temporário de solicitações atingido. Tente novamente em um minuto.",
                     },
                 )
 
+    if protected_path and request.method in {"POST", "PUT"}:
+        chunks, size = [], 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > 1_500_000:
+                return JSONResponse(status_code=413, content={"error": "Conteúdo excede o limite permitido."})
+            chunks.append(chunk)
+        request._body = b"".join(chunks)
     return await call_next(request)
 
 

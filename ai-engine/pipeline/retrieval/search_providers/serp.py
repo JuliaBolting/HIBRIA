@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
-import requests
+from pipeline.security import public_http as requests
 
-from .config import DEFAULT_TIMEOUT, env_flag, valid_api_key
+from .config import provider_enabled, DEFAULT_TIMEOUT, valid_api_key
 from .quota import ProviderQuota
 from .models import SearchHit
 
@@ -19,18 +19,17 @@ class SerpSearchProvider:
         self.searchapi_key = os.getenv("SEARCHAPI_API_KEY", "").strip()
 
     def _provider_candidates(self) -> list[str]:
-        reputation_auto = env_flag("HIBRIA_REPUTATION_USE_CONFIGURED_PROVIDERS", True)
         candidates: list[str] = []
         if (
-            env_flag("HIBRIA_ENABLE_SERPER", False) or reputation_auto
+            provider_enabled("HIBRIA_ENABLE_SERPER")
         ) and valid_api_key(self.serper_key):
             candidates.append("serper")
         if (
-            env_flag("HIBRIA_ENABLE_SERPAPI", False) or reputation_auto
+            provider_enabled("HIBRIA_ENABLE_SERPAPI")
         ) and valid_api_key(self.serpapi_key):
             candidates.append("serpapi")
         if (
-            env_flag("HIBRIA_ENABLE_SEARCHAPI", False) or reputation_auto
+            provider_enabled("HIBRIA_ENABLE_SEARCHAPI")
         ) and valid_api_key(self.searchapi_key):
             candidates.append("searchapi")
         return candidates

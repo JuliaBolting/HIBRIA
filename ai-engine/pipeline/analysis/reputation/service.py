@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pipeline.security.redaction import error_summary
+
 from datetime import datetime, timezone
 import logging
 
@@ -52,7 +54,7 @@ class SourceReputationService:
 
         if requested_domain and not force:
             stored = self.repository.get_by_domain_or_alias(requested_domain)
-            if stored is not None and not _is_expired(stored):
+            if stored is not None and stored.identity.canonical_domain == requested_domain and not _is_expired(stored):
                 stored.metadata = {**stored.metadata, "storage_hit": True, "storage_backend": self.repository.backend}
                 return stored
 
@@ -61,7 +63,7 @@ class SourceReputationService:
 
         if identity.canonical_domain and not force:
             stored = self.repository.get_by_domain_or_alias(identity.canonical_domain)
-            if stored is not None and not _is_expired(stored):
+            if stored is not None and stored.identity.canonical_domain == requested_domain and not _is_expired(stored):
                 stored.metadata = {**stored.metadata, "storage_hit": True, "storage_backend": self.repository.backend}
                 return stored
 
@@ -122,7 +124,7 @@ class SourceReputationService:
             })
             return result
         except Exception as exc:
-            logger.exception("[reputation] avaliação dinâmica falhou")
+            logger.warning("[reputation] avaliação dinâmica falhou: %s", error_summary(exc))
             result = SourceReputation(
                 identity=identity,
                 status="failed",
@@ -134,7 +136,7 @@ class SourceReputationService:
                 method=METHOD_NAME,
                 needs_review=True,
                 requires_external_evidence_weight=True,
-                reason=f"A avaliação da fonte falhou: {type(exc).__name__}: {exc}",
+                reason=error_summary(exc),
                 metadata={"storage_backend": self.repository.backend, **(metadata or {})},
             )
             self.repository.record_run({
@@ -145,7 +147,7 @@ class SourceReputationService:
                 "providers": [],
                 "query_count": 0,
                 "evidence_count": 0,
-                "error": str(exc),
+                "error": error_summary(exc),
                 "started_at": started_at,
                 "finished_at": datetime.now(timezone.utc).isoformat(),
             })

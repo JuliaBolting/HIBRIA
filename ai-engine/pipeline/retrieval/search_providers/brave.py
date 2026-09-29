@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
-import requests
+from pipeline.security import public_http as requests
 
-from .config import DEFAULT_TIMEOUT, env_flag, valid_api_key
+from .config import provider_enabled, DEFAULT_TIMEOUT, valid_api_key
 from .quota import ProviderQuota
 from .models import SearchHit
 
@@ -14,7 +14,7 @@ class BraveSearchProvider:
 
     def __init__(self) -> None:
         self.api_key = os.getenv("BRAVE_SEARCH_API_KEY", "").strip()
-        self.enabled = env_flag("HIBRIA_ENABLE_WEB_SEARCH", False) or env_flag("HIBRIA_REPUTATION_USE_CONFIGURED_PROVIDERS", True)
+        self.enabled = provider_enabled("HIBRIA_ENABLE_WEB_SEARCH")
 
     def is_available(self) -> bool:
         return self.enabled and valid_api_key(self.api_key) and ProviderQuota.can_use(self.name)

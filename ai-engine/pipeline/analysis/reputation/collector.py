@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass, field
 from urllib.parse import urljoin, urlparse
 
-import requests
+from pipeline.security import public_http as requests
 from bs4 import BeautifulSoup
 
 from pipeline.retrieval.search_gateway import SearchGateway

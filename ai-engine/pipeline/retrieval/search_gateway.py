@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+from pipeline.security.redaction import error_summary
 from typing import Iterable
 
 from .search_providers import (
@@ -65,8 +66,8 @@ class SearchGateway:
                 hits = provider.search(query, max_results=max_results)
                 batch.providers_succeeded.append(name)
             except Exception as exc:
-                batch.providers_failed[name] = f"{type(exc).__name__}: {exc}"
-                logger.warning("[search_gateway] %s falhou: %s", name, exc)
+                batch.providers_failed[name] = error_summary(exc)
+                logger.warning("[search_gateway] %s falhou: %s", name, error_summary(exc))
                 continue
 
             for hit in hits:
@@ -94,5 +95,5 @@ class SearchGateway:
             batch.hits = provider.search(query, max_results=max_results)
             batch.providers_succeeded.append("google_factcheck")
         except Exception as exc:
-            batch.providers_failed["google_factcheck"] = f"{type(exc).__name__}: {exc}"
+            batch.providers_failed["google_factcheck"] = error_summary(exc)
         return batch

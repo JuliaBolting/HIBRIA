@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urljoin, urlparse
 
-import requests
+from pipeline.security import public_http as requests
 from bs4 import BeautifulSoup
 
 from .config import DIRECT_FETCH_TIMEOUT
@@ -111,8 +111,13 @@ class SourceIdentityResolver:
             if response.url:
                 canonical_url = response.url
                 final_domain = domain_from_url(response.url)
-                if final_domain:
+                if final_domain and final_domain == requested_domain:
                     canonical_domain = final_domain
+
+            if domain_from_url(response.url) != requested_domain:
+                # Um redirecionamento entre veículos não transfere identidade.
+                return SourceIdentity(requested_url, requested_domain, root_url,
+                                      requested_domain, _fallback_name(requested_domain))
 
             content_type = response.headers.get("Content-Type", "").lower()
             if "html" in content_type or response.text.lstrip().startswith("<"):
@@ -128,7 +133,7 @@ class SourceIdentityResolver:
                 if canonical_tag and canonical_tag.get("href"):
                     candidate_url = urljoin(response.url, canonical_tag.get("href"))
                     candidate_domain = domain_from_url(candidate_url)
-                    if candidate_domain:
+                    if candidate_domain and candidate_domain == requested_domain:
                         canonical_url = candidate_url
                         canonical_domain = candidate_domain
                         aliases.add(candidate_domain)
@@ -146,7 +151,7 @@ class SourceIdentityResolver:
             canonical_url=canonical_url,
             canonical_domain=canonical_domain,
             source_name=source_name,
-            aliases=sorted(alias for alias in aliases if alias),
+            aliases=[],  # aliases entre domínios exigem verificação administrativa
             redirect_chain=redirect_chain,
             homepage_accessible=accessible,
             homepage_status_code=status_code,

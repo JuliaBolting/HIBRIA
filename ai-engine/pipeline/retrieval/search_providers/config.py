@@ -42,3 +42,8 @@ def valid_api_key(value: str) -> bool:
 DEFAULT_TIMEOUT = env_float("HIBRIA_SEARCH_TIMEOUT_SECONDS", 12.0)
 DEFAULT_MAX_RESULTS = env_int("HIBRIA_SEARCH_MAX_RESULTS", 5)
 DEFAULT_MAX_PROVIDERS = env_int("HIBRIA_SEARCH_MAX_PROVIDERS_PER_QUERY", 2)
+
+
+def provider_enabled(name: str) -> bool:
+    """Uma escolha explícita sempre prevalece sobre a seleção automática."""
+    return env_flag(name, env_flag("HIBRIA_REPUTATION_USE_CONFIGURED_PROVIDERS", True))

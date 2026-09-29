@@ -15,7 +15,7 @@
 import time
 from urllib.parse import urlparse
 
-import requests
+from pipeline.security import public_http as requests
 from bs4 import BeautifulSoup
 
 
@@ -197,6 +197,10 @@ class TextExtractor:
         Rejeita file://, ftp://, javascript: e outros esquemas não suportados
         antes de fazer qualquer requisição de rede.
         """
+        try:
+            requests.validate_url(url, resolve=False)
+        except requests.UnsafeURL:
+            raise ExtractionError("URL não permitida para consulta pública.") from None
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):
             raise ExtractionError(f"Esquema inválido: '{url}'")
@@ -271,6 +275,8 @@ class TextExtractor:
                 response.raise_for_status()
                 return response
 
+            except requests.UnsafeURL:
+                raise ExtractionError("O endereço informado não permite uma consulta pública segura.") from None
             except requests.exceptions.Timeout:
                 last_exc = ExtractionError(
                     f"Timeout na tentativa {attempt + 1}: {url}"
@@ -316,10 +322,12 @@ class TextExtractor:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(
                 headless=True,
+                proxy={"server": "http://127.0.0.1:9", "bypass": "<-loopback>"},
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
+                    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
                 ]
             )
             context = browser.new_context(
@@ -331,7 +339,8 @@ class TextExtractor:
                 locale="pt-BR",
                 viewport={"width": 1280, "height": 800},
                 java_script_enabled=True,
-                ignore_https_errors=True,
+                ignore_https_errors=False,
+                service_workers="block",
             )
 
             context.add_init_script("""
@@ -341,12 +350,21 @@ class TextExtractor:
                 window.chrome = { runtime: {} };
             """)
 
+            # Nenhum request do Chromium acessa a rede diretamente. A mesma
+            # validação/DNS fixado do HTTP estático vale para sub-recursos.
+            def safe_route(route):
+                try:
+                    if route.request.method not in {"GET", "HEAD"}:
+                        return route.abort()
+                    response = requests.get(route.request.url, timeout=12)
+                    route.fulfill(status=response.status_code, body=response.content,
+                                  headers={k:v for k,v in response.headers.items() if k.lower() in {
+                                      "content-type", "access-control-allow-origin"}})
+                except Exception:
+                    route.abort()
+            context.route("**/*", safe_route)
+            context.route_web_socket("**/*", lambda socket: socket.close())
             page = context.new_page()
-
-            page.route(
-                "**/*.{woff,woff2,ttf,mp4,mp3,avi,ogg}",
-                lambda route: route.abort(),
-            )
 
             try:
                 page.goto(url, wait_until="domcontentloaded", timeout=45_000)
