@@ -17,7 +17,9 @@ from api.schemas.response import AnalyzeResponse
 from pipeline.pipeline import HibriaPipeline
 from pipeline.persistence.analysis_repository import AnalysisRepository
 from pipeline.persistence.rag_memory_service import RagMemoryService
-from pipeline.preprocessing.extractor import ExtractionError
+from pipeline.preprocessing.extractor import ExtractionError, TextExtractor
+from pipeline.security.redaction import redact
+from pipeline.output.explanation_cache import fingerprint, refresh
 
 
 router = APIRouter(prefix="/analyze", tags=["Analysis"])
@@ -43,6 +45,10 @@ ANALYSIS_SEMAPHORE = threading.BoundedSemaphore(
 ANALYSIS_QUEUE_TIMEOUT = _env_int("HIBRIA_ANALYSIS_QUEUE_TIMEOUT_SECONDS", 600)
 ANALYSIS_JOB_TTL_SECONDS = _env_int("HIBRIA_ANALYSIS_JOB_TTL_SECONDS", 21_600)
 ANALYSIS_JOB_WORKERS = _env_int("HIBRIA_ANALYSIS_JOB_WORKERS", 4)
+MAX_PENDING_JOBS = _env_int("HIBRIA_MAX_PENDING_JOBS", 8)
+MAX_RETAINED_JOBS = _env_int("HIBRIA_MAX_RETAINED_JOBS", 200)
+_job_admission = threading.BoundedSemaphore(MAX_PENDING_JOBS)
+CACHE_POLICY = "server-verified-security-1"
 
 
 class AnalysisJobCancelled(RuntimeError):
@@ -59,6 +65,8 @@ class AnalysisJob:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     cancel_event: threading.Event = field(default_factory=threading.Event)
+    deadline: float = field(default_factory=lambda: time.monotonic() + ANALYSIS_QUEUE_TIMEOUT)
+    future: Any = None
 
 
 _jobs_lock = threading.Lock()
@@ -95,7 +103,7 @@ def _mark_cache(
     analyzed_at=None,
     request_count: int = 1,
 ) -> dict:
-    payload = deepcopy(data)
+    payload = redact(deepcopy(data))
     metadata = payload.setdefault("metadata", {})
     metadata["cache"] = {
         "hit": hit,
@@ -130,6 +138,7 @@ def _is_complete_analysis(data: object) -> bool:
 def _cached_data(
     repository: AnalysisRepository,
     request: AnalyzeRequest,
+    *, refresh_explanation: bool = False,
 ) -> dict[str, Any] | None:
     if not _env_flag("HIBRIA_ANALYSIS_CACHE_ENABLED", True):
         return None
@@ -138,8 +147,18 @@ def _cached_data(
     if cached is None or not _is_complete_analysis(cached.data):
         return None
 
+    data = deepcopy(cached.data)
+    metadata = data.get("metadata") or {}
+    if metadata.get("input_policy") != CACHE_POLICY:
+        return None
+    if metadata.get("explanation_fingerprint") != fingerprint():
+        if not refresh_explanation:
+            return None
+        data = refresh(data)
+        repository.update_result(cached.analysis_id, data)
+
     return _mark_cache(
-        cached.data,
+        data,
         hit=True,
         analysis_id=cached.analysis_id,
         analyzed_at=cached.analyzed_at,
@@ -152,8 +171,8 @@ def _raise_if_cancelled(cancel_event: threading.Event | None) -> None:
         raise AnalysisJobCancelled("Análise cancelada pelo usuário.")
 
 
-def _acquire_analysis_slot(cancel_event: threading.Event | None) -> None:
-    deadline = time.monotonic() + ANALYSIS_QUEUE_TIMEOUT
+def _acquire_analysis_slot(cancel_event: threading.Event | None, deadline: float | None = None) -> None:
+    deadline = deadline if deadline is not None else time.monotonic() + ANALYSIS_QUEUE_TIMEOUT
     while True:
         _raise_if_cancelled(cancel_event)
         remaining = deadline - time.monotonic()
@@ -171,6 +190,7 @@ def _perform_analysis(
     *,
     progress_callback: Callable[[str], None] | None = None,
     cancel_event: threading.Event | None = None,
+    deadline: float | None = None,
 ) -> dict[str, Any]:
     repository = AnalysisRepository()
     _raise_if_cancelled(cancel_event)
@@ -179,10 +199,10 @@ def _perform_analysis(
     if cached is not None:
         return cached
 
-    _acquire_analysis_slot(cancel_event)
+    _acquire_analysis_slot(cancel_event, deadline)
     try:
         _raise_if_cancelled(cancel_event)
-        cached = _cached_data(repository, request)
+        cached = _cached_data(repository, request, refresh_explanation=True)
         if cached is not None:
             return cached
 
@@ -191,15 +211,25 @@ def _perform_analysis(
             if progress_callback is not None:
                 progress_callback(step_name)
 
+        report_progress("extractor")
+        extracted = TextExtractor.extract(str(request.url))
+        verified_content = extracted.get("content", "").strip()[:200_000]
+        if len(verified_content) < 100:
+            raise ExtractionError("Não foi possível conferir o conteúdo desta página no servidor. Tente outra notícia.")
+        _raise_if_cancelled(cancel_event)
         result = HibriaPipeline.run(
             url=str(request.url),
-            title=request.title,
-            content=request.content,
+            title=extracted.get("title", "")[:500],
+            content=verified_content,
             progress_callback=report_progress,
         )
         _raise_if_cancelled(cancel_event)
 
         data = result.response or result.to_dict()
+        data.setdefault("metadata", {}).update(input_policy=CACHE_POLICY,
+                                               explanation_fingerprint=fingerprint(),
+                                               render_method=extracted.get("render_method", "static"),
+                                               paywall_detected=bool(extracted.get("paywall_detected", False)))
         if not _is_complete_analysis(data):
             raise RuntimeError(
                 "A análise terminou sem score ou classificação final; "
@@ -211,8 +241,8 @@ def _perform_analysis(
         )
         analysis_id = repository.save(
             url=str(request.url),
-            title=result.title or request.title,
-            content=request.content,
+            title=result.title or "Notícia",
+            content=verified_content,
             score=result.score_final,
             classification=result.label_final,
             explanation=result.explanation,
@@ -248,6 +278,16 @@ def _cleanup_jobs() -> None:
         ]
         for job_id in expired:
             _jobs.pop(job_id, None)
+        for job in _jobs.values():
+            if job.status == "queued" and time.monotonic() >= job.deadline:
+                job.cancel_event.set()
+                job.status, job.error = "failed", "A espera excedeu o limite. Tente novamente."
+                if job.future is not None:
+                    job.future.cancel()
+        terminal = sorted((job for job in _jobs.values() if job.status in {"completed", "failed", "cancelled"}),
+                          key=lambda job: job.updated_at)
+        for job in terminal[:max(0, len(_jobs) - MAX_RETAINED_JOBS)]:
+            _jobs.pop(job.job_id, None)
 
 
 def _job_payload(job: AnalysisJob) -> dict[str, Any]:
@@ -316,6 +356,7 @@ def _run_job(job_id: str, request: AnalyzeRequest) -> None:
             request,
             progress_callback=progress,
             cancel_event=cancel_event,
+            deadline=job.deadline,
         )
         _raise_if_cancelled(cancel_event)
         _update_job(
@@ -333,7 +374,7 @@ def _run_job(job_id: str, request: AnalyzeRequest) -> None:
             error="Análise cancelada pelo usuário.",
         )
     except ExtractionError as exc:
-        _update_job(job_id, status="failed", data=None, error=str(exc))
+        _update_job(job_id, status="failed", data=None, error=redact(str(exc)))
     except HTTPException as exc:
         _update_job(job_id, status="failed", data=None, error=str(exc.detail))
     except Exception as exc:
@@ -341,7 +382,7 @@ def _run_job(job_id: str, request: AnalyzeRequest) -> None:
             job_id,
             status="failed",
             data=None,
-            error=f"Erro inesperado: {str(exc)}",
+            error="Não foi possível concluir a análise. Tente novamente mais tarde.",
         )
 
 
@@ -360,6 +401,8 @@ def _get_job(job_id: str) -> AnalysisJob:
 @router.post("", response_model=AnalyzeResponse)
 def analyze(request: AnalyzeRequest):
     """Endpoint síncrono mantido para compatibilidade."""
+    if not _job_admission.acquire(blocking=False):
+        raise HTTPException(429, "Servidor ocupado. Tente novamente em instantes.", headers={"Retry-After": "30"})
     try:
         return AnalyzeResponse(
             success=True,
@@ -369,14 +412,16 @@ def analyze(request: AnalyzeRequest):
     except HTTPException:
         raise
     except ExtractionError as exc:
-        return AnalyzeResponse(success=False, data=None, error=str(exc))
+        return AnalyzeResponse(success=False, data=None, error=redact(str(exc)))
     except Exception as exc:
         return AnalyzeResponse(
             success=False,
             data=None,
-            error=f"Erro inesperado: {str(exc)}",
+            error="Não foi possível concluir a análise. Tente novamente mais tarde.",
         )
 
+    finally:
+        _job_admission.release()
 
 @router.put("/jobs/{job_id}")
 def start_analysis_job(job_id: UUID, request: AnalyzeRequest):
@@ -389,11 +434,20 @@ def start_analysis_job(job_id: UUID, request: AnalyzeRequest):
         if existing is not None:
             return _job_payload(existing)
 
+        if not _job_admission.acquire(blocking=False):
+            raise HTTPException(429, "Servidor ocupado. Tente novamente em instantes.", headers={"Retry-After": "30"})
         job = AnalysisJob(job_id=job_key)
         _jobs[job_key] = job
         payload = _job_payload(job)
 
-    _job_executor.submit(_run_job, job_key, request.model_copy(deep=True))
+    try:
+        job.future = _job_executor.submit(_run_job, job_key, request.model_copy(deep=True))
+        job.future.add_done_callback(lambda _future: _job_admission.release())
+    except Exception:
+        _job_admission.release()
+        with _jobs_lock:
+            _jobs.pop(job_key, None)
+        raise HTTPException(503, "Não foi possível iniciar a análise.") from None
     return payload
 
 
@@ -407,6 +461,8 @@ def cancel_analysis_job(job_id: UUID):
     job = _get_job(str(job_id))
     with _jobs_lock:
         job.cancel_event.set()
+        if job.future is not None:
+            job.future.cancel()
         if job.status not in {"completed", "failed"}:
             job.status = "cancelled"
             job.error = "Análise cancelada pelo usuário."

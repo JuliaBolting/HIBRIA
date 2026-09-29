@@ -116,6 +116,7 @@ class AnalysisRepository:
                 FROM analises
                 WHERE hash_url = %(url_hash)s
                   AND versao_pipeline = %(pipeline_version)s
+                  AND resultado_json #>> '{metadata,input_policy}' = 'server-verified-security-1'
                   AND (
                         %(cache_ttl_hours)s = 0
                         OR data_analise >= NOW() - (
@@ -280,7 +281,7 @@ class AnalysisRepository:
 
         query = """
             UPDATE analises
-            SET resultado_json = %(data)s
+            SET resultado_json = %(data)s, explicacao = %(explanation)s
             WHERE id = %(analysis_id)s;
         """
 
@@ -300,7 +301,7 @@ class AnalysisRepository:
                 with connection.cursor() as cursor:
                     cursor.execute(
                         query,
-                        {"analysis_id": analysis_id, "data": payload},
+                        {"analysis_id": analysis_id, "data": payload, "explanation": data.get("explanation", "")},
                     )
                     return cursor.rowcount == 1
         except Exception as exc:
