@@ -23,6 +23,10 @@
 from __future__ import annotations
 
 import json
+import threading
+from functools import wraps
+from filelock import FileLock
+from .vector_storage import active_paths, publish
 import logging
 import time
 import uuid
@@ -71,6 +75,20 @@ class SearchResult:
 # =============================================================================
 # VectorStore
 # =============================================================================
+
+def _consistent_operation(method):
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._thread_lock, self._disk_lock:
+            self._load()
+            try:
+                return method(self, *args, **kwargs)
+            except Exception:
+                # Nenhum item apenas em memória pode ser reconciliado como salvo.
+                self._load()
+                raise
+    return wrapped
+
 
 class VectorStore:
     """
@@ -122,6 +140,8 @@ class VectorStore:
         self._path = Path(store_path or self.DEFAULT_STORE_PATH)
         self._path.mkdir(parents=True, exist_ok=True)
 
+        self._thread_lock = threading.RLock()
+        self._disk_lock = FileLock(str(self._path / "write.lock"), timeout=180)
         self._index_path    = self._path / "index.faiss"
         self._metadata_path = self._path / "metadata.json"
 
@@ -136,7 +156,8 @@ class VectorStore:
         self._dims = self._embedding_model.dims
 
         # carrega índice existente se disponível
-        self._load()
+        with self._thread_lock, self._disk_lock:
+            self._load()
 
     # =========================================================================
     # FAISS — carregamento lazy
@@ -175,61 +196,29 @@ class VectorStore:
     # =========================================================================
 
     def _load(self) -> None:
-        """
-        Carrega índice FAISS e metadados do disco se existirem.
-        Chamado no __init__ — o VectorStore fica pronto para uso imediato.
-        """
         faiss = self._get_faiss()
-
-        if self._index_path.exists() and self._metadata_path.exists():
-            try:
-                self._index = faiss.read_index(str(self._index_path))
-                with open(self._metadata_path, "r", encoding="utf-8") as f:
-                    self._metadata = json.load(f)
-
-                logger.info(
-                    f"[vector_store] índice carregado: "
-                    f"{self._index.ntotal} vetores · "
-                    f"{len(self._metadata)} documentos"
-                )
-                if self._index.ntotal != len(self._metadata):
-                    logger.warning(
-                        "[vector_store] índice inconsistente: %s vetores para "
-                        "%s metadados; execute scripts/repair_faiss_index.py",
-                        self._index.ntotal,
-                        len(self._metadata),
-                    )
-            except Exception as e:
-                logger.error(f"[vector_store] falha ao carregar índice: {e}")
-                self._create_index()
-                self._metadata = []
-        else:
-            # primeiro uso — cria índice vazio
+        self._index_path, self._metadata_path = active_paths(self._path)
+        if not self._index_path.exists() and not self._metadata_path.exists():
+            if (self._path / "CURRENT").exists():
+                raise ValueError("Geração FAISS ausente; restaure o backup.")
             self._create_index()
             self._metadata = []
-            logger.info("[vector_store] índice vazio criado (primeira execução)")
+            return
+        if not self._index_path.exists() or not self._metadata_path.exists():
+            raise ValueError("FAISS incompleto; execute scripts/repair_faiss_index.py.")
+        index = faiss.read_index(str(self._index_path))
+        metadata = json.loads(self._metadata_path.read_text(encoding="utf-8"))
+        if (not isinstance(metadata, list) or index.ntotal != len(metadata)
+                or any(not isinstance(item, dict) or item.get("faiss_id") != i for i, item in enumerate(metadata))):
+            raise ValueError("FAISS inconsistente; execute scripts/repair_faiss_index.py antes de gravar.")
+        if index.d != self._dims:
+            raise ValueError("Dimensão do FAISS difere do modelo configurado.")
+        self._index, self._metadata = index, metadata
 
     def _save(self) -> None:
-        """
-        Persiste o índice FAISS e metadados em disco.
-        Chamado após cada operação de indexação.
-        """
-        if self._index is None:
-            return
-
-        faiss = self._get_faiss()
-
-        try:
-            faiss.write_index(self._index, str(self._index_path))
-            with open(self._metadata_path, "w", encoding="utf-8") as f:
-                json.dump(self._metadata, f, ensure_ascii=False, indent=2)
-
-            logger.debug(
-                f"[vector_store] salvo: {self._index.ntotal} vetores"
-            )
-        except Exception as e:
-            logger.error(f"[vector_store] falha ao salvar índice: {e}")
-            raise
+        if self._index is not None:
+            self._index_path, self._metadata_path = publish(
+                self._path, self._get_faiss(), self._index, self._metadata)
 
     # =========================================================================
     # Chunking de documentos longos
@@ -276,6 +265,7 @@ class VectorStore:
     # Indexação
     # =========================================================================
 
+    @_consistent_operation
     def add_document(self, document: Document) -> list[str]:
         """
         Indexa um documento, dividindo em chunks se necessário.
@@ -326,6 +316,7 @@ class VectorStore:
         )
         return doc_ids
 
+    @_consistent_operation
     def add_documents(
         self,
         documents: list[Document],
@@ -401,6 +392,7 @@ class VectorStore:
     # Busca
     # =========================================================================
 
+    @_consistent_operation
     def query(
         self,
         query_text: str,
@@ -517,6 +509,7 @@ class VectorStore:
     # Utilitários
     # =========================================================================
 
+    @_consistent_operation
     def remove_document(self, base_doc_id: str) -> int:
         """
         Remove todos os chunks de um documento pelo base_doc_id.
@@ -589,6 +582,7 @@ class VectorStore:
         """Número de documentos únicos (base_doc_id distintos)."""
         return len({m["base_doc_id"] for m in self._metadata})
 
+    @_consistent_operation
     def contains_document(self, base_doc_id: str) -> bool:
         """Confirma se um documento base já possui chunks no índice."""
         return any(

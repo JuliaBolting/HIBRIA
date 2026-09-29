@@ -20,6 +20,9 @@ import numpy as np
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
+from filelock import FileLock
+from pipeline.retrieval.vector_storage import active_paths, publish
+
 DEFAULT_STORE = ROOT_DIR / "data" / "vector_store"
 
 
@@ -43,7 +46,7 @@ def load_metadata(path: Path) -> list[dict]:
 def diagnose(store_path: Path, metadata: list[dict]) -> tuple[int, int]:
     import faiss
 
-    index_path = store_path / "index.faiss"
+    index_path, _ = active_paths(store_path)
     index = faiss.read_index(str(index_path))
     vectors = int(index.ntotal)
     rows = len(metadata)
@@ -67,8 +70,9 @@ def rebuild(store_path: Path, metadata: list[dict], drop_fakebr: bool) -> None:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     backup_dir = store_path / "backups" / stamp
     backup_dir.mkdir(parents=True, exist_ok=False)
-    shutil.copy2(store_path / "index.faiss", backup_dir / "index.faiss")
-    shutil.copy2(store_path / "metadata.json", backup_dir / "metadata.json")
+    index_path, metadata_path = active_paths(store_path)
+    shutil.copy2(index_path, backup_dir / "index.faiss")
+    shutil.copy2(metadata_path, backup_dir / "metadata.json")
 
     model = EmbeddingModel("multilingual-minilm")
     texts = [str(item["text"]).strip() for item in selected]
@@ -89,15 +93,7 @@ def rebuild(store_path: Path, metadata: list[dict], drop_fakebr: bool) -> None:
         repaired["faiss_id"] = position
         repaired_metadata.append(repaired)
 
-    temp_index = store_path / "index.faiss.repairing"
-    temp_metadata = store_path / "metadata.json.repairing"
-    faiss.write_index(index, str(temp_index))
-    temp_metadata.write_text(
-        json.dumps(repaired_metadata, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    temp_index.replace(store_path / "index.faiss")
-    temp_metadata.replace(store_path / "metadata.json")
+    publish(store_path, faiss, index, repaired_metadata)
 
     print(f"Backup: {backup_dir}")
     print(f"Reconstruído: {len(repaired_metadata)} vetores/metadados")
@@ -110,20 +106,21 @@ def main() -> None:
     parser.add_argument("--drop-fakebr", action="store_true")
     args = parser.parse_args()
 
-    index_path = args.store / "index.faiss"
-    metadata_path = args.store / "metadata.json"
-    if not index_path.exists() or not metadata_path.exists():
-        raise SystemExit(f"Índice incompleto em {args.store}")
+    with FileLock(str(args.store / "write.lock"), timeout=180):
+        index_path, metadata_path = active_paths(args.store)
+        if not index_path.exists() or not metadata_path.exists():
+            raise SystemExit(f"Índice incompleto em {args.store}")
 
-    metadata = load_metadata(metadata_path)
-    diagnose(args.store, metadata)
-    if not args.repair:
-        print("Nenhuma alteração feita. Para corrigir, acrescente --repair.")
-        return
+        metadata = load_metadata(metadata_path)
+        diagnose(args.store, metadata)
+        if not args.repair:
+            print("Nenhuma alteração feita. Para corrigir, acrescente --repair.")
+            return
 
-    rebuild(args.store, metadata, drop_fakebr=args.drop_fakebr)
-    repaired = load_metadata(metadata_path)
-    diagnose(args.store, repaired)
+        rebuild(args.store, metadata, drop_fakebr=args.drop_fakebr)
+        _, metadata_path = active_paths(args.store)
+        repaired = load_metadata(metadata_path)
+        diagnose(args.store, repaired)
 
 
 if __name__ == "__main__":
