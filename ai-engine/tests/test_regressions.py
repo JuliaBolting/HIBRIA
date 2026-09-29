@@ -148,8 +148,6 @@ class StanceRegressionTests(unittest.TestCase):
         self.assertEqual(result.stance, "contradict")
 
 
-# Contratos de explicação foram migrados para test_explanation_v6.py:
-# não se exige mais omitir evidências, contar apoios como fatos ou cortar frases.
 
 if __name__ == "__main__":
     unittest.main()
