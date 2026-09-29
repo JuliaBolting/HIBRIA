@@ -34,6 +34,8 @@ class SourceTrustResolver:
             for item in os.getenv("HIBRIA_TRUSTED_DOMAINS", "").split(",")
             if item.strip()
         }
+        if os.getenv("HIBRIA_ALLOW_STATIC_TRUST", "false").lower() != "true":
+            self.static_domains = set()
         self._cache: dict[str, float | None] = {}
 
     @staticmethod
@@ -65,10 +67,8 @@ class SourceTrustResolver:
                         """
                         SELECT fr.score_reputacao
                         FROM fontes_reputacao fr
-                        LEFT JOIN aliases_fontes_reputacao afr
-                          ON afr.fonte_id = fr.id AND afr.ativo = TRUE
-                        WHERE (fr.dominio_canonico = %(domain)s
-                               OR afr.dominio_alias = %(domain)s)
+
+                        WHERE fr.dominio_canonico = %(domain)s
                           AND fr.status_avaliacao = 'evaluated'
                           AND (fr.proxima_reavaliacao IS NULL
                                OR fr.proxima_reavaliacao > NOW())

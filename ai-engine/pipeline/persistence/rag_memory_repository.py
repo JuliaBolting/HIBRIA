@@ -108,11 +108,10 @@ class RagMemoryRepository:
             """
             SELECT fr.score_reputacao
             FROM fontes_reputacao fr
-            LEFT JOIN aliases_fontes_reputacao afr
-              ON afr.fonte_id = fr.id
-             AND afr.ativo = TRUE
+
             WHERE fr.dominio_canonico = %(domain)s
-               OR afr.dominio_alias = %(domain)s
+              AND fr.status_avaliacao = 'evaluated'
+              AND (fr.proxima_reavaliacao IS NULL OR fr.proxima_reavaliacao > NOW())
             ORDER BY fr.data_ultima_verificacao DESC
             LIMIT 1;
             """,

@@ -21,6 +21,7 @@
 # =============================================================================
 
 from __future__ import annotations
+from pipeline.analysis.factual_evidence import eligible
 import logging
 from dataclasses import dataclass, field
 import os
@@ -74,6 +75,7 @@ class EvidenceSimilarity:
 
     rank:                 int           # posição no ranking (0 = mais similar)
     metadata:             dict = field(default_factory=dict)
+    evidence_id:          str = ""
 
 
 @dataclass
@@ -228,7 +230,7 @@ class SimilarityCalculator:
 
         for rr in retrieval_results:
             for ev in rr.evidences:
-                key = ev.text[:200]  # chave de deduplicação
+                key = ev.text  # chave de deduplicação
                 if key not in evidence_text_to_idx:
                     evidence_text_to_idx[key] = len(evidence_texts_unique)
                     evidence_texts_unique.append(ev.text)
@@ -284,7 +286,7 @@ class SimilarityCalculator:
 
             for ev in retrieval.evidences:
                 # recupera o embedding desta evidência pelo índice deduplificado
-                ev_key = ev.text[:200]
+                ev_key = ev.text
                 ev_idx = evidence_text_to_idx.get(ev_key)
                 if ev_idx is None:
                     continue
@@ -319,10 +321,11 @@ class SimilarityCalculator:
                     is_sufficient        = is_sufficient,
                     rank                 = 0,  # atualizado abaixo
                     metadata             = dict(getattr(ev, "metadata", {}) or {}),
+                    evidence_id          = getattr(ev, "evidence_id", ""),
                 ))
 
-            # ordena por similarity_final decrescente e atribui rank
-            ev_similarities.sort(key=lambda e: e.similarity_final, reverse=True)
+            # Preserva primeiro as evidências elegíveis, inclusive antes do corte TOP_K.
+            ev_similarities.sort(key=lambda e: (eligible(e), e.similarity_final), reverse=True)
             for rank, ev_sim in enumerate(ev_similarities[:cls.TOP_K]):
                 ev_sim.rank = rank
 

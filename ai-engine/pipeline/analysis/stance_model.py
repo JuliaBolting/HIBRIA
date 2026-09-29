@@ -17,6 +17,7 @@
 # =============================================================================
 
 from __future__ import annotations
+from pipeline.analysis.factual_evidence import eligible
 
 import hashlib
 import os
@@ -294,7 +295,7 @@ class StanceModel:
             sufficient_evidences = [
                 item
                 for item in candidate_evidences
-                if bool(getattr(item, "is_sufficient", False))
+                if eligible(item) and bool(getattr(item, "is_sufficient", False))
                 and float(getattr(item, "similarity_final", 0.0) or 0.0) >= cls.MIN_SIMILARITY
             ]
 

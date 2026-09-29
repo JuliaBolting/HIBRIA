@@ -36,10 +36,12 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 
-import requests
+from pipeline.security import public_http as requests
 
 from .search_providers.quota import ProviderQuota
 from .source_trust import SourceTrustResolver
+from pipeline.analysis.factual_evidence import eligible
+from pipeline.security.redaction import error_summary
 
 logger = logging.getLogger(__name__)
 
@@ -3690,6 +3692,8 @@ class EvidenceRetriever:
         acionar a IA fallback. Wikipedia não conta aqui, pois é contexto.
         """
         for evidence in evidences:
+            if not eligible(evidence):
+                continue
             if evidence.source_type == "encyclopedia":
                 continue
 
@@ -3711,6 +3715,8 @@ class EvidenceRetriever:
         sufficient: list[Evidence] = []
 
         for evidence in evidences:
+            if not eligible(evidence):
+                continue
             if evidence.source_type == "encyclopedia":
                 continue
 
@@ -3798,7 +3804,7 @@ class EvidenceRetriever:
             try:
                 evidences = source.search(claim, top_k=top_k)
             except Exception as exc:
-                layers_failed[source.name] = f"erro inesperado: {exc}"
+                layers_failed[source.name] = error_summary(exc)
 
                 # Evita repetir o mesmo traceback para todas as claims quando
                 # uma fonte quebra por erro interno durante a execução.
@@ -3808,7 +3814,7 @@ class EvidenceRetriever:
                     except Exception:
                         pass
 
-                logger.error("[%s] erro inesperado", source.name, exc_info=True)
+                logger.error("[%s] %s", source.name, error_summary(exc))
                 continue
 
             valid_evidences = [
@@ -3826,9 +3832,12 @@ class EvidenceRetriever:
                 trusted, reputation = self._trust_resolver.resolve(
                     evidence.domain or evidence.url
                 )
-                evidence.trusted_source = bool(
-                    evidence.trusted_source or trusted
-                )
+                evidence.trusted_source = bool(trusted)
+                if evidence.retrieval_layer == "vector_store":
+                    # Aprovação antiga no FAISS não prevalece sobre reputação
+                    # expirada/rebaixada nem sobre uma lista estática desativada.
+                    evidence.metadata["approved_for_rag"] = bool(
+                        evidence.metadata.get("approved_for_rag") is True and trusted)
                 evidence.metadata["dynamic_source_reputation"] = reputation
                 evidence.metadata["trust_source"] = (
                     "dynamic_reputation" if trusted else "not_evaluated_or_below_threshold"

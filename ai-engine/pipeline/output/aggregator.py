@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from pipeline.analysis.factual_evidence import eligible, value
 
 
 def env_float(name: str, default: float, aliases: list[str] | None = None) -> float:
@@ -88,66 +89,9 @@ class Aggregator:
 
     @classmethod
     def _is_valid_factual_evidence(cls, item: Any) -> bool:
-        """
-        Define se uma evidência pode entrar no cálculo factual.
-
-        A evidência precisa:
-        - existir;
-        - passar do limiar mínimo de similaridade;
-        - não ser Wikipedia/contexto enciclopédico;
-        - ser marcada como suficiente pelo similarity.py, quando esse campo existir.
-        """
-        if not getattr(item, "has_evidence", False):
+        if not value(item, "has_evidence", False):
             return False
-
-        if getattr(item, "score", None) is None:
-            return False
-
-        if item.score < cls.MIN_VALID_EVIDENCE_SCORE:
-            return False
-
-        if (
-            hasattr(item, "has_sufficient_evidence")
-            and not item.has_sufficient_evidence
-        ):
-            return False
-
-        top = getattr(item, "top_evidence", None)
-        if not top:
-            return False
-
-        layer = getattr(top, "evidence_layer", "")
-        source_type = getattr(top, "source_type", "")
-        trusted_source = bool(getattr(top, "trusted_source", False))
-
-        if layer in cls.EXCLUDED_EVIDENCE_LAYERS:
-            return False
-
-        if source_type in cls.EXCLUDED_SOURCE_TYPES:
-            return False
-
-        if hasattr(top, "is_sufficient") and not top.is_sufficient:
-            return False
-
-        # Checagens profissionais são aceitas pela própria natureza da fonte.
-        if layer == "factcheck" or source_type == "fact_check":
-            return True
-
-        # O FAISS só pode influenciar o resultado quando o item foi aprovado
-        # pela política de memória RAG. Isso impede a notícia analisada (ou um
-        # item não verificado) de servir como evidência de si mesma.
-        if layer == "vector_store":
-            metadata = getattr(top, "metadata", {}) or {}
-            return bool(
-                metadata.get("approved_for_rag") is True or trusted_source
-            )
-
-        # Notícias e páginas recuperadas da web somente contam no score após
-        # a reputação dinâmica do domínio atingir o limiar configurado.
-        if not trusted_source:
-            return False
-
-        return True
+        return eligible(value(item, "top_evidence"), value(item, "score", 0))
 
     @classmethod
     def _calculate_evidence_score(cls, result: Any) -> float:
@@ -255,7 +199,23 @@ class Aggregator:
             "contradiction_rate": 0.0,
         }
 
+        allowed = set()
+        similarities = getattr(result, "similarity_scores", []) or []
+        for similarity in similarities:
+            candidates = value(similarity, "evidences", []) or [value(similarity, "top_evidence")]
+            for evidence in candidates:
+                if eligible(evidence, value(evidence, "similarity_final", value(similarity, "score", 0))):
+                    reference = value(evidence, "evidence_id", "") or value(evidence, "evidence_url", "")
+                    if reference:
+                        allowed.add((value(similarity, "claim_id", ""), reference))
         for item in result.stance_results or []:
+            if value(item, "stance") != "insufficient":
+                if similarities:
+                    reference = value(item, "evidence_id", "") or value(item, "url", "")
+                    if (value(item, "claim_id", ""), reference) not in allowed:
+                        continue
+                elif not eligible(item):
+                    continue
             if hasattr(item, "stance"):
                 stance = item.stance
             elif isinstance(item, dict):
