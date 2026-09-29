@@ -14,8 +14,9 @@ import re
 import unicodedata
 from types import SimpleNamespace
 from typing import Any
+from pipeline.analysis.factual_evidence import eligible
 
-VERSION = "explanation-7.0.0"
+VERSION = "explanation-7.1.0"
 
 
 def value(obj: Any, key: str, default=None):
@@ -91,6 +92,7 @@ def build_context(result) -> dict:
             contextual += int(is_context)
             refs.append({
                 "id": evidence_id,
+                "elegivel_no_calculo": eligible(ev, relation.get("similarity") or metadata.get("stance_similarity") or value(ev, "similarity", 0)),
                 "texto": plain(value(ev, "text", "")),
                 "titulo": plain(value(ev, "title", "")),
                 "fonte": plain(value(ev, "source", "")),
@@ -205,18 +207,21 @@ def compact_context(context: dict, max_chars: int) -> dict:
     raise ValueError("Contexto decisório excede o limite configurado; dados não foram cortados silenciosamente.")
 
 
+def eligible_signals(item):
+    return {norm(ref.get("sinal_automatico")) for ref in item.get("referencias", [])
+            if ref.get("elegivel_no_calculo") is True and ref.get("sinal_automatico")}
+
+
+def item_group(item):
+    signals = eligible_signals(item)
+    return ("mixed" if {"support", "contradict"} <= signals else
+            "support" if "support" in signals else
+            "difference" if "contradict" in signals else "open")
+
+
 def _item_reading(item: dict) -> str:
     """Traduz sinais internos sem promovê-los a fatos confirmados."""
-    signals = {
-        norm(ref.get("sinal_automatico"))
-        for ref in item.get("referencias", [])
-        if ref.get("sinal_automatico")
-    }
-    signals.update(
-        norm(record.get("stance"))
-        for record in item.get("registros_automaticos", [])
-        if record.get("stance")
-    )
+    signals = eligible_signals(item)
     has_support = "support" in signals
     has_difference = "contradict" in signals
     if has_support and has_difference:
@@ -234,19 +239,7 @@ def _ordered_items(items: list[dict]) -> list[dict]:
     """Espalha casos favoráveis, divergentes e inconclusivos pelo recorte."""
     groups = {"mixed": [], "support": [], "difference": [], "open": []}
     for item in items:
-        signals = {
-            norm(ref.get("sinal_automatico"))
-            for ref in item.get("referencias", [])
-            if ref.get("sinal_automatico")
-        }
-        signals.update(
-            norm(record.get("stance"))
-            for record in item.get("registros_automaticos", [])
-            if record.get("stance")
-        )
-        key = ("mixed" if {"support", "contradict"} <= signals else
-               "support" if "support" in signals else
-               "difference" if "contradict" in signals else "open")
+        key = item_group(item)
         groups[key].append(item)
     ordered = []
     while any(groups.values()):
@@ -309,12 +302,14 @@ def build_model_context(context: dict, max_chars: int) -> tuple[dict, dict]:
         points = []
         for item in selected:
             point = {
+                "id": item.get("id"),
+                "situacao": item_group(item),
                 "parte_da_noticia": excerpt(item.get("texto_selecionado", ""), claim_size),
                 "leitura_cautelosa": _item_reading(item),
             }
             if refs_per_item:
                 snippets = [excerpt(ref.get("texto", ""), ref_size)
-                            for ref in item.get("referencias", []) if plain(ref.get("texto"))]
+                            for ref in item.get("referencias", []) if ref.get("elegivel_no_calculo") is True and plain(ref.get("texto"))]
                 if snippets:
                     point["trechos_relacionados"] = snippets[:refs_per_item]
             points.append(point)
