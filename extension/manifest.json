@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "HÍBRIA",
   "description": "Análise inteligente de confiabilidade de conteúdo.",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "action": {
     "default_title": "HÍBRIA",
     "default_popup": "index.html"
