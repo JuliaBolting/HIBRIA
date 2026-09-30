@@ -666,7 +666,13 @@ function FeedbackCard({ result }) {
           {[1, 2, 3, 4, 5].map((star) => (
             <span className="rating-star" key={star}>
               <svg className="rating-star-art" viewBox="0 0 44 44" aria-hidden="true" focusable="false">
-                <polygon className="rating-star-halo" points="22,5 27.2,16.5 40,17.6 30.4,26.1 33.3,38.5 22,32 10.7,38.5 13.6,26.1 4,17.6 16.8,16.5" />
+                <g
+                  className="rating-star-highlight"
+                  style={{ clipPath: highlighted === star - 0.5 ? "inset(-25% 50% -25% -25%)" : "none" }}
+                >
+                  <polygon className="rating-star-halo" points="22,5 27.2,16.5 40,17.6 30.4,26.1 33.3,38.5 22,32 10.7,38.5 13.6,26.1 4,17.6 16.8,16.5" />
+                </g>
+                <polygon className="rating-star-focus" points="22,5 27.2,16.5 40,17.6 30.4,26.1 33.3,38.5 22,32 10.7,38.5 13.6,26.1 4,17.6 16.8,16.5" />
                 <polygon className="rating-star-empty" points="22,5 27.2,16.5 40,17.6 30.4,26.1 33.3,38.5 22,32 10.7,38.5 13.6,26.1 4,17.6 16.8,16.5" />
                 <polygon
                   className="rating-star-filled"

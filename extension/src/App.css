@@ -1093,7 +1093,7 @@ button:focus-visible {
 }
 
 
-/* Duas áreas de toque; o destaque visual pertence à estrela inteira. */
+/* Duas áreas de toque; a sombra acompanha a parte escolhida da estrela. */
 .rating-star {
   position: relative;
   display: flex;
@@ -1115,15 +1115,27 @@ button:focus-visible {
 .rating-star-empty { fill: #aab1bc; }
 .rating-star-filled { fill: #f5a300; }
 
-.rating-star-halo {
-  fill: rgba(245, 163, 0, 0.16);
-  stroke: #c78100;
-  stroke-width: 1;
-  stroke-linejoin: round;
-  transform: scale(1.14);
-  transform-origin: 22px 22px;
+.rating-star-highlight {
   opacity: 0;
   transition: opacity 0.16s ease;
+}
+
+.rating-star-halo {
+  fill: rgba(245, 163, 0, 0.12);
+  stroke: none;
+  transform: scale(1.3);
+  transform-origin: 22px 22px;
+}
+
+/* Contorno apenas para navegação pelo teclado, separado da sombra do mouse. */
+.rating-star-focus {
+  fill: none;
+  stroke: #1577c8;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  transform: scale(1.2);
+  transform-origin: 22px 22px;
+  opacity: 0;
 }
 
 .star-rating .star-half {
@@ -1141,18 +1153,12 @@ button:focus-visible {
 /* O foco continua visível, com o mesmo contorno da estrela. */
 .star-rating .star-half:focus-visible { outline: none; }
 
-.rating-star:has(.star-half:hover:not(:disabled)) .rating-star-halo,
-.rating-star:has(.star-half:focus-visible) .rating-star-halo { opacity: 1; }
+.rating-star:has(.star-half:hover:not(:disabled)) .rating-star-highlight,
+.rating-star:has(.star-half:focus-visible) .rating-star-highlight { opacity: 1; }
 
-.rating-star:has(.star-half:focus-visible) .rating-star-halo {
-  fill: rgba(21, 119, 200, 0.12);
-  stroke: #1577c8;
-  stroke-width: 1.8;
-}
+.rating-star:has(.star-half:focus-visible) .rating-star-focus { opacity: 1; }
 
-:root[data-theme="dark"] .rating-star:has(.star-half:focus-visible) .rating-star-halo {
-  stroke: #87cbff;
-}
+:root[data-theme="dark"] .rating-star-focus { stroke: #87cbff; }
 
 .rating-star:has(.star-half:hover:not(:disabled)) .rating-star-art,
 .rating-star:has(.star-half:focus-visible) .rating-star-art {
@@ -1168,7 +1174,7 @@ button:focus-visible {
 @media (forced-colors: active) {
   .rating-star-empty { fill: Canvas; stroke: ButtonText; }
   .rating-star-filled { fill: Highlight; }
-  .rating-star:has(.star-half:focus-visible) .rating-star-halo { stroke: Highlight; }
+  .rating-star:has(.star-half:focus-visible) .rating-star-focus { stroke: Highlight; }
 }
 
 
@@ -1270,7 +1276,7 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rating-star-art, .rating-star-halo { transition: none; }
+  .rating-star-art, .rating-star-highlight { transition: none; }
   .rating-star .rating-star-art { transform: none; }
 }
 
