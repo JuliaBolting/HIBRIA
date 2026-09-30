@@ -16,7 +16,7 @@ from types import SimpleNamespace
 from typing import Any
 from pipeline.analysis.factual_evidence import eligible
 
-VERSION = "explanation-7.1.0"
+VERSION = "explanation-7.2.0"
 
 
 def value(obj: Any, key: str, default=None):
@@ -105,7 +105,13 @@ def build_context(result) -> dict:
                 "similaridade_no_sinal": number(relation.get("similarity") or metadata.get("stance_similarity")),
             })
         layers = value(retrieval, "layers_failed", []) or []
-        failed_layers.update(str(layer) for layer in layers)
+        if isinstance(layers, dict):
+            for layer, message in layers.items():
+                status = norm(str(message))
+                if not any(word in status for word in (
+                    "nao disponivel", "desativ", "disabled", "sem resultados",
+                    "pulada", "parada antecipada", "not available")):
+                    failed_layers.add(str(layer))
         items.append({"id": claim_id, "texto_selecionado": plain(value(claim, "text", "")),
                       "referencias": refs, "registros_automaticos": relations})
 

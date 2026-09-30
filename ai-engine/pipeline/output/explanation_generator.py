@@ -12,6 +12,7 @@ import time
 
 import requests
 
+from pipeline.cancellation import checkpoint
 from .explanation_context import VERSION, build_context, build_model_context, excerpt, norm, number, plain, item_group
 
 from .explanation_grounding import grounding_errors
@@ -255,78 +256,56 @@ Retorne somente JSON com "explanation" e "details". Não use títulos, listas nu
         decision, signals = context["decisao"], context["sinais"]
         reason = decision["motivo"]
         points = cls._point_groups(context)
-        subject = excerpt(context.get("noticia", {}).get("titulo", ""), 100).rstrip(" .")
-        supported_point = (points["support"] or points["mixed"] or [""])[0]
-        support = supported_point or subject
-        limited = (points["open"] or points["mixed"] or points["difference"] or [subject])[0]
+        support = (points["support"] or [""])[0]
+        limited = (points["open"] or [""])[0]
         different = (points["difference"] or points["mixed"] or [""])[0]
-        origin, text = signals["origem"]["nota"], signals["texto"]["nota"]
+        origin, textual = signals["origem"]["nota"], signals["texto"]["nota"]
         if origin is not None and origin >= 80:
             auxiliary = "A boa reputação do veículo ajudou na nota."
-        elif origin is not None and origin < 50:
-            auxiliary = "A avaliação baixa da reputação do veículo limitou esse componente da nota."
-        elif origin is not None:
-            auxiliary = "A reputação do veículo também participou da nota."
-        elif text is not None and text >= 80:
-            auxiliary = "Os padrões de escrita contribuíram como um sinal favorável na nota."
-        elif text is not None:
-            auxiliary = "Os padrões de escrita participaram da nota apenas como sinal auxiliar."
-        else:
-            auxiliary = "Não havia um fator auxiliar disponível para reforçar a nota."
-        if reason == "criterios_para_confiavel_atendidos":
-            explanation = (f"O resultado foi “confiável” porque os materiais comparados deram apoio suficiente às informações avaliadas. "
-                           f"A parte sobre {cls._about(support)} recebeu apoio nas verificações. {auxiliary}")
-            first = f"A parte sobre {cls._about(support)} encontrou apoio suficiente nos materiais considerados pela análise."
-        elif reason == "criterios_atendidos_parcialmente":
-            explanation = ("O resultado foi “parcialmente confiável” porque parte das informações recebeu apoio, mas o conjunto não atingiu todos os critérios da classificação mais alta. "
-                           f"A parte sobre {cls._about(support)} recebeu apoio nas verificações, enquanto a parte sobre {cls._about(limited)} ficou sem sustentação suficiente. {auxiliary}")
-            first = f"Os materiais encontrados ajudaram a sustentar a parte sobre {cls._about(support)}, sem confirmar sozinhos todos os detalhes da notícia."
-        elif reason == "sinais_de_contradicao":
-            explanation = ("O resultado foi “não confiável” porque as diferenças encontradas atingiram o limite definido para essa classificação. "
-                           f"A parte sobre {cls._about(different)} não coincidiu com alguns dos materiais comparados. {auxiliary}")
-            first = f"A parte sobre {cls._about(different)} não coincidiu com alguns dos materiais comparados e pesou contra a notícia."
-        elif reason == "nenhum_item_aceito_no_calculo":
-            explanation = (f"O resultado foi “{decision['rotulo']}” porque nenhuma das informações avaliadas recebeu apoio direto suficiente. "
-                           f"O ponto sobre {cls._about(limited)} permaneceu sem sustentação nas verificações. {auxiliary}")
-            first = f"Foram localizados textos relacionados a {cls._about(limited)}, mas relação de assunto não equivale a confirmação do que aconteceu."
-        elif reason == "poucos_itens_aceitos_no_calculo":
-            contrast = (f"A parte sobre {cls._about(support)} recebeu confirmação nas verificações, mas a parte sobre {cls._about(limited)} não teve sustentação suficiente."
-                        if supported_point else
-                        f"Foram encontrados materiais sobre {cls._about(subject)}, mas eles não sustentaram suficientemente as informações principais.")
-            explanation = (f"O resultado foi “{decision['rotulo']}” porque somente uma pequena parte das informações importantes recebeu confirmação nas verificações. "
-                           f"{contrast} {auxiliary}")
-            first = (f"As comparações deram algum apoio à parte sobre {cls._about(support)}. "
-                     "Esse apoio, sozinho, não foi suficiente para sustentar o conteúdo principal.") if support else (
-                         f"Foram encontrados materiais sobre {cls._about(limited)}, mas eles não deram apoio direto suficiente ao conteúdo principal.")
-        else:
-            explanation = (f"O resultado foi “{decision['rotulo']}” porque os materiais disponíveis não permitiram uma conclusão segura. "
-                           f"O ponto sobre {cls._about(limited)} permaneceu sem sustentação suficiente. {auxiliary}")
-            first = f"O ponto sobre {cls._about(limited)} permaneceu em aberto com os materiais que puderam ser examinados."
-        if origin is not None and origin >= 80:
             second = "O veículo recebeu uma boa avaliação de reputação. Isso ajuda na nota, mas não garante que cada informação desta notícia esteja correta."
         elif origin is not None and origin < 50:
-            second = "A avaliação de reputação do veículo foi baixa e limitou a contribuição desse componente para a nota. Isso não demonstra, sozinho, que a notícia seja falsa."
-        elif origin is None:
-            second = "Não há uma avaliação de reputação disponível para contribuir com este resultado. Ausência de avaliação não significa má reputação."
-        else:
+            auxiliary = "A avaliação baixa da reputação do veículo limitou esse componente da nota."
+            second = "A reputação do veículo contribuiu pouco para a nota. Essa avaliação, sozinha, não demonstra que a notícia seja falsa."
+        elif origin is not None:
+            auxiliary = "A reputação do veículo também participou da nota."
             second = "A reputação do veículo participou da nota, mas não foi tratada como prova dos acontecimentos relatados."
-        if origin is None and text is not None:
-            second = ("A análise do texto identificou padrões de escrita favoráveis. Esse sinal ajuda na nota, mas não verifica os acontecimentos."
-                      if text >= 80 else "A análise da escrita participou da nota como um sinal auxiliar; ela não determina se os acontecimentos são verdadeiros.")
+        else:
+            auxiliary = ""
+            second = "Não havia avaliação de reputação disponível para este resultado. Ausência de avaliação não significa má reputação."
+            if textual is not None:
+                second = "Os padrões de escrita participaram da nota como sinal auxiliar. Eles não verificam os acontecimentos relatados."
+        reasons = {
+            "criterios_para_confiavel_atendidos": "os materiais comparados deram apoio suficiente às informações avaliadas",
+            "criterios_atendidos_parcialmente": "as verificações deram apoio a parte do conteúdo, mas a combinação dos critérios não atingiu a classificação mais alta",
+            "sinais_de_contradicao": "as divergências encontradas pesaram contra as informações avaliadas",
+            "nenhum_item_aceito_no_calculo": "nenhum ponto recebeu uma referência que atendesse a todos os critérios necessários",
+            "poucos_itens_aceitos_no_calculo": "somente uma pequena parte das informações importantes contou com referências suficientes nas verificações",
+        }
+        explanation = f"O resultado foi “{decision['rotulo']}” porque {reasons.get(reason, 'os materiais disponíveis não permitiram uma conclusão segura')}."
+        if reason == "sinais_de_contradicao" and different:
+            example = f"A parte sobre {cls._about(different)} apresentou diferenças nos materiais comparados."
+        elif support and limited:
+            example = f"A parte sobre {cls._about(support)} recebeu apoio, mas a parte sobre {cls._about(limited)} ficou sem sustentação suficiente."
+        elif support:
+            example = f"A parte sobre {cls._about(support)} recebeu apoio nas verificações."
+        elif limited:
+            example = f"Não houve sustentação suficiente para o ponto sobre {cls._about(limited)}."
+        elif different:
+            example = f"Os materiais apresentaram sinais diferentes sobre {cls._about(different)}."
+        else:
+            example = "Os registros disponíveis não permitem apontar uma confirmação específica com segurança."
+        explanation = " ".join(part for part in [explanation, example, auxiliary] if part)
+        first = example
         if signals["falhas_de_recuperacao"]:
             third = "Parte da busca não pôde ser concluída, o que limita os materiais disponíveis. Uma falha de consulta não é evidência contra a notícia."
-        elif reason == "criterios_para_confiavel_atendidos":
-            third = "O resultado vale para os dados analisados naquele momento. Atualizações da notícia ou novas referências podem levar a outra avaliação."
         elif reason == "sinais_de_contradicao":
             third = "Diferenças de contexto, data ou formulação também podem produzir sinais de divergência. O resultado não autoriza uma acusação de mentira."
+        elif limited:
+            third = "A falta de apoio para os pontos que ficaram em aberto limitou a avaliação. Isso não prova, por si só, que a notícia seja falsa."
         else:
-            third = (f"O ponto sobre {cls._about(limited)} permanece em aberto. "
-                     "A falta de apoio suficiente, por si só, não prova que a notícia seja falsa.")
-        explanation = cls._complete_sentences(explanation, cls.MAX_EXPLANATION_CHARS)
-        first = cls._complete_sentences(first, cls.MAX_DETAIL_CHARS)
-        second = cls._complete_sentences(second, cls.MAX_DETAIL_CHARS)
-        third = cls._complete_sentences(third, cls.MAX_DETAIL_CHARS)
-        return {"explanation": explanation, "details": [first, second, third]}
+            third = "O resultado vale para os pontos examinados e as referências disponíveis naquele momento. Atualizações da notícia podem levar a outra avaliação."
+        return {"explanation": cls._complete_sentences(explanation, cls.MAX_EXPLANATION_CHARS),
+                "details": [cls._complete_sentences(text, cls.MAX_DETAIL_CHARS) for text in [first, second, third]]}
 
     @staticmethod
     def _complete_sentences(text, limit):
@@ -358,6 +337,7 @@ Retorne somente JSON com "explanation" e "details". Não use títulos, listas nu
         """Até um reparo local, no mesmo prazo total; nenhum fallback no prompt."""
         trace = trace if trace is not None else {}
         context = cls._build_context(result)
+        checkpoint()
         fallback = cls.fallback_report(result)
         trace.update({"version": cls.VERSION, "full_context": context, "attempts": []})
         started = time.monotonic()
