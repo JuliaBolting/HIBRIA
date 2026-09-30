@@ -1093,50 +1093,82 @@ button:focus-visible {
 }
 
 
-.star-rating button {
-  display: grid;
-  width: 35px;
-  height: 35px;
+/* Duas áreas de toque; o destaque visual pertence à estrela inteira. */
+.rating-star {
+  position: relative;
+  display: flex;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+
+.rating-star-art {
+  position: absolute;
+  inset: 0;
+  width: 44px;
+  height: 44px;
+  overflow: visible;
+  pointer-events: none;
+  transition: transform 0.16s ease;
+}
+
+.rating-star-empty { fill: #aab1bc; }
+.rating-star-filled { fill: #f5a300; }
+
+.rating-star-halo {
+  fill: rgba(245, 163, 0, 0.16);
+  stroke: #c78100;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  transform: scale(1.14);
+  transform-origin: 22px 22px;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.star-rating .star-half {
+  position: relative;
+  width: 22px;
+  height: 44px;
   padding: 0;
-  place-items: center;
-  color: #aab1bc;
   background: transparent;
   border: 0;
-  border-radius: 50%;
+  border-radius: 0;
   cursor: pointer;
-  font-size: 27px;
-  line-height: 1;
-  transform-origin: center;
-  transition:
-    color 0.16s ease,
-    background 0.16s ease,
-    transform 0.16s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* O foco continua visível, com o mesmo contorno da estrela. */
+.star-rating .star-half:focus-visible { outline: none; }
 
-.star-rating button:hover,
-.star-rating button:focus-visible {
-  background: rgba(245, 163, 0, 0.12);
-  transform: translateY(-2px) scale(1.08);
+.rating-star:has(.star-half:hover:not(:disabled)) .rating-star-halo,
+.rating-star:has(.star-half:focus-visible) .rating-star-halo { opacity: 1; }
+
+.rating-star:has(.star-half:focus-visible) .rating-star-halo {
+  fill: rgba(21, 119, 200, 0.12);
+  stroke: #1577c8;
+  stroke-width: 1.8;
 }
 
-
-.star-rating button.selected {
-  color: #f5a300;
-  animation: star-pop 0.22s ease both;
+:root[data-theme="dark"] .rating-star:has(.star-half:focus-visible) .rating-star-halo {
+  stroke: #87cbff;
 }
 
-
-.star-rating button:disabled {
-  cursor: default;
-  opacity: 1;
+.rating-star:has(.star-half:hover:not(:disabled)) .rating-star-art,
+.rating-star:has(.star-half:focus-visible) .rating-star-art {
+  transform: translateY(-2px) scale(1.04);
 }
 
+.rating-star:has(.star-half:active:not(:disabled)) .rating-star-art {
+  transform: scale(0.96);
+}
 
-@keyframes star-pop {
-  50% {
-    transform: scale(1.18) rotate(-5deg);
-  }
+.star-rating .star-half:disabled { cursor: default; opacity: 1; }
+
+@media (forced-colors: active) {
+  .rating-star-empty { fill: Canvas; stroke: ButtonText; }
+  .rating-star-filled { fill: Highlight; }
+  .rating-star:has(.star-half:focus-visible) .rating-star-halo { stroke: Highlight; }
 }
 
 
@@ -1237,13 +1269,12 @@ button:focus-visible {
   }
 }
 
-/* Cada estrela tem duas áreas clicáveis e acessíveis por teclado. */
-.rating-star { display: flex; width: 44px; height: 44px; }
-.star-rating .star-half { width: 22px; height: 44px; position: relative; overflow: hidden; border-radius: 5px; }
-.star-half > span { position: absolute; width: 44px; text-align: center; font-size: 34px; pointer-events: none; }
-.star-half.left > span { left: 0; }
-.star-half.right > span { right: 0; }
-.star-rating .star-half:focus-visible { outline: 2px solid #1577c8; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
-  .star-rating button, .star-rating button.selected { animation: none; transition: none; }
+  .rating-star-art, .rating-star-halo { transition: none; }
+  .rating-star .rating-star-art { transform: none; }
 }
+
+/* No modo claro, o ícone acompanha exatamente a cor do texto. */
+.new-analysis-icon { display: none; width: 17px; height: 17px; flex-shrink: 0; }
+:root:not([data-theme="dark"]) .new-analysis-button img { display: none; }
+:root:not([data-theme="dark"]) .new-analysis-icon { display: block; }

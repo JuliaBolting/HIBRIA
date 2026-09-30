@@ -583,6 +583,20 @@ function App() {
             onClick={handleNewAnalysis}
           >
             <img src="/rotate-ccw.png" alt="" />
+            <svg
+              className="new-analysis-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M3 10a9 9 0 1 1 2.6 8.4" />
+              <path d="M3 4v6h6" />
+            </svg>
             <span>Nova Análise</span>
           </button>
         </main>
@@ -651,6 +665,15 @@ function FeedbackCard({ result }) {
         >
           {[1, 2, 3, 4, 5].map((star) => (
             <span className="rating-star" key={star}>
+              <svg className="rating-star-art" viewBox="0 0 44 44" aria-hidden="true" focusable="false">
+                <polygon className="rating-star-halo" points="22,5 27.2,16.5 40,17.6 30.4,26.1 33.3,38.5 22,32 10.7,38.5 13.6,26.1 4,17.6 16.8,16.5" />
+                <polygon className="rating-star-empty" points="22,5 27.2,16.5 40,17.6 30.4,26.1 33.3,38.5 22,32 10.7,38.5 13.6,26.1 4,17.6 16.8,16.5" />
+                <polygon
+                  className="rating-star-filled"
+                  points="22,5 27.2,16.5 40,17.6 30.4,26.1 33.3,38.5 22,32 10.7,38.5 13.6,26.1 4,17.6 16.8,16.5"
+                  style={{ clipPath: `inset(0 ${highlighted >= star ? 0 : highlighted >= star - 0.5 ? 50 : 100}% 0 0)` }}
+                />
+              </svg>
               {[star - 0.5, star].map((value, half) => (
                 <button
                   key={value}
@@ -665,9 +688,7 @@ function FeedbackCard({ result }) {
                   aria-checked={rating === value}
                   aria-label={`${String(value).replace(".", ",")} ${value === 1 ? "estrela" : "estrelas"}`}
                   title={`${String(value).replace(".", ",")} de 5 estrelas`}
-                >
-                  <span aria-hidden="true">★</span>
-                </button>
+                />
               ))}
             </span>
           ))}
