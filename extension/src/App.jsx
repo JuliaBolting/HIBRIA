@@ -646,26 +646,30 @@ function FeedbackCard({ result }) {
         <div
           className="star-rating"
           role="radiogroup"
-          aria-label="Avaliação do resultado de uma a cinco estrelas"
+          aria-label="Avaliação de meia a cinco estrelas, em passos de meia estrela"
           onMouseLeave={() => setHovered(0)}
         >
-          {[1, 2, 3, 4, 5].map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={value <= highlighted ? "selected" : ""}
-              onMouseEnter={() => !rating && setHovered(value)}
-              onFocus={() => !rating && setHovered(value)}
-              onBlur={() => setHovered(0)}
-              onClick={() => chooseRating(value)}
-              disabled={Boolean(rating) || submitting}
-              role="radio"
-              aria-checked={rating === value}
-              aria-label={`${value} ${value === 1 ? "estrela" : "estrelas"}`}
-              title={`${value} ${value === 1 ? "estrela" : "estrelas"}`}
-            >
-              ★
-            </button>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <span className="rating-star" key={star}>
+              {[star - 0.5, star].map((value, half) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`star-half ${half ? "right" : "left"} ${value <= highlighted ? "selected" : ""}`}
+                  onMouseEnter={() => !rating && setHovered(value)}
+                  onFocus={() => !rating && setHovered(value)}
+                  onBlur={() => setHovered(0)}
+                  onClick={() => chooseRating(value)}
+                  disabled={Boolean(rating) || submitting}
+                  role="radio"
+                  aria-checked={rating === value}
+                  aria-label={`${String(value).replace(".", ",")} ${value === 1 ? "estrela" : "estrelas"}`}
+                  title={`${String(value).replace(".", ",")} de 5 estrelas`}
+                >
+                  <span aria-hidden="true">★</span>
+                </button>
+              ))}
+            </span>
           ))}
         </div>
       ) : (

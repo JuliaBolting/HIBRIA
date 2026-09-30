@@ -1236,3 +1236,14 @@ button:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Cada estrela tem duas áreas clicáveis e acessíveis por teclado. */
+.rating-star { display: flex; width: 44px; height: 44px; }
+.star-rating .star-half { width: 22px; height: 44px; position: relative; overflow: hidden; border-radius: 5px; }
+.star-half > span { position: absolute; width: 44px; text-align: center; font-size: 34px; pointer-events: none; }
+.star-half.left > span { left: 0; }
+.star-half.right > span { right: 0; }
+.star-rating .star-half:focus-visible { outline: 2px solid #1577c8; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .star-rating button, .star-rating button.selected { animation: none; transition: none; }
+}
