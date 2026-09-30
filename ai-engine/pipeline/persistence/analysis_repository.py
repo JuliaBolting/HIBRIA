@@ -11,7 +11,13 @@ import re
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from pipeline.security.redaction import error_summary
+
 logger = logging.getLogger(__name__)
+
+
+class PersistenceError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -47,9 +53,24 @@ class AnalysisRepository:
     def is_configured(self) -> bool:
         return bool(self.database_url)
 
+    def ensure_ready(self):
+        """Falha antes de gastar consultas se o banco/migração não estiver pronto."""
+        if not self.is_configured:
+            raise PersistenceError("Banco de dados não configurado.")
+        try:
+            import psycopg2
+            with psycopg2.connect(self.database_url, connect_timeout=5) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT id, revisao_criada_em FROM analises LIMIT 0")
+        except Exception as exc:
+            logger.error("[analysis_repository] banco indisponível: %s", error_summary(exc))
+            raise PersistenceError("Banco de dados indisponível ou migração 005 pendente.") from None
+
     @staticmethod
     def pipeline_version() -> str:
-        return os.getenv("HIBRIA_PIPELINE_VERSION", "1.2.1").strip() or "1.2.1"
+        configured = os.getenv("HIBRIA_PIPELINE_VERSION", "1.2.1").strip() or "1.2.1"
+        # A mudança de cálculo invalida o cache mesmo com .env antigo.
+        return configured[:50] + ":directional-2"
 
     @staticmethod
     def cache_ttl_hours() -> int:
@@ -123,7 +144,7 @@ class AnalysisRepository:
                             %(cache_ttl_hours)s * INTERVAL '1 hour'
                         )
                   )
-                ORDER BY data_analise DESC
+                ORDER BY data_analise DESC, revisao_criada_em DESC
                 LIMIT 1
                 FOR UPDATE
             )
@@ -173,7 +194,7 @@ class AnalysisRepository:
         except Exception as exc:
             logger.warning(
                 "[analysis_repository] consulta ao cache falhou: %s",
-                exc,
+                error_summary(exc),
             )
             return None
 
@@ -190,7 +211,7 @@ class AnalysisRepository:
         data: dict[str, Any],
     ) -> str | None:
         if not self.is_configured:
-            return None
+            raise PersistenceError("Banco de dados não configurado.")
 
         identity = self.cache_identity(url, content)
         query = """
@@ -221,20 +242,6 @@ class AnalysisRepository:
                 %(processing_time)s,
                 %(data)s
             )
-            ON CONFLICT (hash_url, hash_conteudo, versao_pipeline)
-            DO UPDATE SET
-                url_original = EXCLUDED.url_original,
-                url_normalizada = EXCLUDED.url_normalizada,
-                titulo = EXCLUDED.titulo,
-                conteudo = EXCLUDED.conteudo,
-                score_final = EXCLUDED.score_final,
-                classificacao_final = EXCLUDED.classificacao_final,
-                explicacao = EXCLUDED.explicacao,
-                tempo_processamento_segundos = EXCLUDED.tempo_processamento_segundos,
-                resultado_json = EXCLUDED.resultado_json,
-                data_analise = NOW(),
-                ultima_consulta_em = NOW(),
-                quantidade_consultas = analises.quantidade_consultas + 1
             RETURNING id;
         """
 
@@ -270,9 +277,9 @@ class AnalysisRepository:
         except Exception as exc:
             logger.warning(
                 "[analysis_repository] gravação da análise falhou: %s",
-                exc,
+                error_summary(exc),
             )
-            return None
+            raise PersistenceError("A análise não pôde ser salva no banco de dados.") from None
 
     def update_result(self, analysis_id: str, data: dict[str, Any]) -> bool:
         """Atualiza o JSON após a sincronização da memória RAG."""
@@ -282,7 +289,10 @@ class AnalysisRepository:
         query = """
             UPDATE analises
             SET resultado_json = %(data)s, explicacao = %(explanation)s
-            WHERE id = %(analysis_id)s;
+            WHERE id = %(analysis_id)s
+              AND resultado_json->'analysis' IS NOT DISTINCT FROM %(data)s::jsonb->'analysis'
+              AND resultado_json->'explanation' IS NOT DISTINCT FROM %(data)s::jsonb->'explanation'
+              AND resultado_json->'details' IS NOT DISTINCT FROM %(data)s::jsonb->'details';
         """
 
         try:
@@ -307,6 +317,58 @@ class AnalysisRepository:
         except Exception as exc:
             logger.warning(
                 "[analysis_repository] atualização do resultado falhou: %s",
-                exc,
+                error_summary(exc),
             )
             return False
+
+
+    def revise_explanation(self, analysis_id: str, data: dict[str, Any]) -> str:
+        """Nova versão de redação; votos e prazo do cache anterior são preservados."""
+        import psycopg2
+        from psycopg2.extras import Json
+        payload = Json(data, dumps=lambda obj: json.dumps(obj, ensure_ascii=False, default=str))
+        try:
+            with psycopg2.connect(self.database_url) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO analises (
+                            url_original, url_normalizada, hash_url, titulo, conteudo,
+                            hash_conteudo, versao_pipeline, score_final, classificacao_final,
+                            explicacao, tempo_processamento_segundos, resultado_json,
+                            data_analise, analise_anterior_id)
+                        SELECT url_original, url_normalizada, hash_url, titulo, conteudo,
+                            hash_conteudo, versao_pipeline, score_final, classificacao_final,
+                            %s, tempo_processamento_segundos, %s, data_analise, id
+                        FROM analises WHERE id = %s
+                        RETURNING id;
+                    """, (data.get("explanation", ""), payload, analysis_id))
+                    row = cursor.fetchone()
+                    if row is None:
+                        raise PersistenceError("Análise original não encontrada.")
+                    new_id = str(row[0])
+                    cursor.execute("""
+                        INSERT INTO claims_analise (
+                            analise_id, claim_id_pipeline, ordem, texto, texto_normalizado,
+                            hash_claim, sujeito, confianca, entidades_json, metadata_json)
+                        SELECT %s, claim_id_pipeline, ordem, texto, texto_normalizado,
+                            hash_claim, sujeito, confianca, entidades_json, metadata_json
+                        FROM claims_analise WHERE analise_id = %s;
+                    """, (new_id, analysis_id))
+                    cursor.execute("""
+                        INSERT INTO claim_evidencias (
+                            analise_id, claim_id, evidencia_id, evidence_id_pipeline,
+                            camada_recuperacao, ordem, similaridade_retriever,
+                            similaridade_final, stance, stance_confianca, stance_motivo, metadata_json)
+                        SELECT %s, novo.id, ce.evidencia_id, ce.evidence_id_pipeline,
+                            ce.camada_recuperacao, ce.ordem, ce.similaridade_retriever,
+                            ce.similaridade_final, ce.stance, ce.stance_confianca, ce.stance_motivo, ce.metadata_json
+                        FROM claim_evidencias ce
+                        JOIN claims_analise antigo ON antigo.id = ce.claim_id
+                        JOIN claims_analise novo ON novo.analise_id = %s
+                            AND novo.claim_id_pipeline = antigo.claim_id_pipeline
+                        WHERE ce.analise_id = %s;
+                    """, (new_id, new_id, analysis_id))
+            return new_id
+        except Exception as exc:
+            logger.error("[analysis_repository] revisão não salva: %s", error_summary(exc))
+            raise PersistenceError("Não foi possível salvar a nova explicação.") from None

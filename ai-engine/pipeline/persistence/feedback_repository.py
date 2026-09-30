@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class FeedbackRecord:
-    rating: int
+    rating: float
     category: str
     already_submitted: bool
 
@@ -32,14 +32,14 @@ class FeedbackRepository:
         return bool(self.database_url)
 
     @staticmethod
-    def category(rating: int) -> str:
+    def category(rating: float) -> str:
         if rating >= 4:
             return "positiva"
-        if rating == 3:
+        if rating >= 3:
             return "neutra"
         return "negativa"
 
-    def save(self, analysis_id: str, evaluator_id: str, rating: int) -> FeedbackRecord:
+    def save(self, analysis_id: str, evaluator_id: str, rating: float) -> FeedbackRecord:
         if not self.is_configured:
             raise RuntimeError("Banco de dados não configurado para avaliações.")
 
@@ -85,7 +85,7 @@ class FeedbackRepository:
                     raise RuntimeError("A avaliação não pôde ser recuperada.")
 
         return FeedbackRecord(
-            rating=int(row[0]),
+            rating=float(row[0]),
             category=str(row[1]),
             already_submitted=already_submitted,
         )

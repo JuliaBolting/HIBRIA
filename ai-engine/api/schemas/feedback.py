@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 class FeedbackRequest(BaseModel):
     analysis_id: UUID
     evaluator_id: UUID
-    rating: int = Field(ge=1, le=5)
+    rating: float = Field(ge=0.5, le=5, multiple_of=0.5, allow_inf_nan=False)
 
 
 class FeedbackSummary(BaseModel):
@@ -22,7 +22,7 @@ class FeedbackSummary(BaseModel):
 
 class FeedbackResponse(BaseModel):
     success: bool
-    rating: int
+    rating: float
     category: str
     already_submitted: bool = False
     summary: FeedbackSummary

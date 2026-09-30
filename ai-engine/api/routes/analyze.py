@@ -5,6 +5,8 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import os
+import logging
+import traceback
 import threading
 import time
 from typing import Any, Callable
@@ -15,10 +17,11 @@ from fastapi import APIRouter, HTTPException
 from api.schemas.request import AnalyzeRequest
 from api.schemas.response import AnalyzeResponse
 from pipeline.pipeline import HibriaPipeline
-from pipeline.persistence.analysis_repository import AnalysisRepository
+from pipeline.persistence.analysis_repository import AnalysisRepository, PersistenceError
 from pipeline.persistence.rag_memory_service import RagMemoryService
 from pipeline.preprocessing.extractor import ExtractionError, TextExtractor
-from pipeline.security.redaction import redact
+from pipeline.security.redaction import redact, error_summary
+from pipeline.cancellation import AnalysisCancelled as AnalysisJobCancelled, cancellable
 from pipeline.output.explanation_cache import fingerprint, refresh
 
 
@@ -51,8 +54,14 @@ _job_admission = threading.BoundedSemaphore(MAX_PENDING_JOBS)
 CACHE_POLICY = "server-verified-security-1"
 
 
-class AnalysisJobCancelled(RuntimeError):
-    pass
+logger = logging.getLogger(__name__)
+
+
+def _log_failure(exc):
+    # Registra classe e locais da falha, nunca argumentos/credenciais da exceção.
+    frames = traceback.extract_tb(exc.__traceback__)
+    locations = " > ".join(f"{os.path.basename(f.filename)}:{f.lineno}:{f.name}" for f in frames)
+    logger.error("[analysis] %s at %s", error_summary(exc), locations)
 
 
 @dataclass
@@ -147,6 +156,7 @@ def _cached_data(
     if cached is None or not _is_complete_analysis(cached.data):
         return None
 
+    analysis_id = cached.analysis_id
     data = deepcopy(cached.data)
     metadata = data.get("metadata") or {}
     if metadata.get("input_policy") != CACHE_POLICY:
@@ -155,12 +165,12 @@ def _cached_data(
         if not refresh_explanation:
             return None
         data = refresh(data)
-        repository.update_result(cached.analysis_id, data)
+        analysis_id = repository.revise_explanation(cached.analysis_id, data)
 
     return _mark_cache(
         data,
         hit=True,
-        analysis_id=cached.analysis_id,
+        analysis_id=analysis_id,
         analyzed_at=cached.analyzed_at,
         request_count=cached.request_count,
     )
@@ -185,6 +195,7 @@ def _acquire_analysis_slot(cancel_event: threading.Event | None, deadline: float
             return
 
 
+@cancellable
 def _perform_analysis(
     request: AnalyzeRequest,
     *,
@@ -193,6 +204,7 @@ def _perform_analysis(
     deadline: float | None = None,
 ) -> dict[str, Any]:
     repository = AnalysisRepository()
+    repository.ensure_ready()
     _raise_if_cancelled(cancel_event)
 
     cached = _cached_data(repository, request)
@@ -250,6 +262,9 @@ def _perform_analysis(
             data=data,
         )
 
+        if not analysis_id:
+            raise RuntimeError("Não foi possível salvar a análise no banco de dados.")
+        _raise_if_cancelled(cancel_event)
         rag_memory = RagMemoryService().persist_and_index(
             analysis_id,
             result,
@@ -258,7 +273,8 @@ def _perform_analysis(
         metadata = data.setdefault("metadata", {})
         metadata["rag_memory"] = rag_memory
         if analysis_id:
-            repository.update_result(analysis_id, data)
+            if not repository.update_result(analysis_id, data):
+                logger.warning("[analysis] metadados RAG não atualizados; resultado principal preservado")
 
         return _mark_cache(data, hit=False, analysis_id=analysis_id)
     finally:
@@ -373,11 +389,15 @@ def _run_job(job_id: str, request: AnalyzeRequest) -> None:
             data=None,
             error="Análise cancelada pelo usuário.",
         )
+    except PersistenceError as exc:
+        _log_failure(exc)
+        _update_job(job_id, status="failed", data=None, error="Não foi possível salvar ou recuperar a análise. Verifique a conexão com o banco de dados.")
     except ExtractionError as exc:
         _update_job(job_id, status="failed", data=None, error=redact(str(exc)))
     except HTTPException as exc:
         _update_job(job_id, status="failed", data=None, error=str(exc.detail))
     except Exception as exc:
+        _log_failure(exc)
         _update_job(
             job_id,
             status="failed",
@@ -411,9 +431,13 @@ def analyze(request: AnalyzeRequest):
         )
     except HTTPException:
         raise
+    except PersistenceError as exc:
+        _log_failure(exc)
+        raise HTTPException(503, "Não foi possível salvar ou recuperar a análise. Verifique a conexão com o banco de dados.") from None
     except ExtractionError as exc:
         return AnalyzeResponse(success=False, data=None, error=redact(str(exc)))
     except Exception as exc:
+        _log_failure(exc)
         return AnalyzeResponse(
             success=False,
             data=None,
