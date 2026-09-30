@@ -29,6 +29,9 @@
 
 from __future__ import annotations
 
+from pipeline.cancellation import checkpoint
+from pipeline.security.redaction import error_summary
+
 import logging
 import os
 import time
@@ -1223,6 +1226,7 @@ class HibriaPipeline:
         # =====================================================================
 
         for name, step in all_steps:
+            checkpoint()
 
             step_start = time.time()
 
@@ -1251,20 +1255,17 @@ class HibriaPipeline:
                 raise
 
             except Exception as e:
-
-                msg = (
-                    f"[{name}] falhou: "
-                    f"{type(e).__name__}: {e}"
-                )
+                if name in {"cleaner", "normalizer", "segmentation", "claim_detector",
+                            "retriever", "similarity", "stance", "aggregator", "formatter"}:
+                    # Uma etapa central quebrada não equivale a falta de evidência.
+                    raise RuntimeError(f"Falha na etapa obrigatória: {name}.") from e
+                msg = f"[{name}] falhou: {error_summary(e)}"
 
                 result.warnings.append(
                     msg
                 )
 
-                logger.error(
-                    msg,
-                    exc_info=True,
-                )
+                logger.error(msg)
 
             result._processing_time[name] = round(
                 time.time() - step_start,

@@ -25,6 +25,8 @@
 
 from __future__ import annotations
 
+from pipeline.cancellation import checkpoint
+
 import hashlib
 import json
 import logging
@@ -3632,6 +3634,7 @@ class EvidenceRetriever:
         current_url: URL da notícia que está sendo analisada.
         document_context: contexto do documento que está sendo analisado.
         """
+        self._current_url = current_url
         self._document_context = normalize_space(document_context)
         self._trust_resolver = SourceTrustResolver()
         self._sources: list[EvidenceSource] = [
@@ -3675,7 +3678,7 @@ class EvidenceRetriever:
         seen: set[str] = set()
         deduped: list[Evidence] = []
 
-        for evidence in evidences:
+        for evidence in sorted(evidences, key=lambda ev: (eligible(ev), self._rank_score(ev)), reverse=True):
             key = evidence.url or evidence.text[:120].lower()
 
             if key in seen:
@@ -3773,6 +3776,7 @@ class EvidenceRetriever:
         layers_failed: dict[str, str] = {}
 
         for source in self._sources:
+            checkpoint()
             if not source.is_available():
                 layers_failed[source.name] = (
                     "não disponível (sem API key, limite atingido ou base local ausente)"
@@ -3817,15 +3821,21 @@ class EvidenceRetriever:
                 logger.error("[%s] %s", source.name, error_summary(exc))
                 continue
 
+            checkpoint()
             valid_evidences = [
                 evidence
                 for evidence in evidences
-                if evidence.text
+                if not _is_same_article_url(self._current_url, evidence.url)
+                and evidence.text
                 and len(evidence.text.strip()) >= self.MIN_EVIDENCE_CHARS
                 and evidence.similarity >= self.MIN_SIMILARITY
             ]
 
             for evidence in valid_evidences:
+                checkpoint()
+                if evidence.retrieval_layer == "wikipedia" or evidence.source_type == "encyclopedia":
+                    evidence.trusted_source = False
+                    continue
                 if evidence.source_type == "fact_check":
                     evidence.trusted_source = True
                     continue
@@ -3859,7 +3869,7 @@ class EvidenceRetriever:
 
         ranked = sorted(
             all_evidences,
-            key=self._rank_score,
+            key=lambda evidence: (eligible(evidence), self._rank_score(evidence)),
             reverse=True,
         )[:top_k]
 
@@ -3884,6 +3894,7 @@ class EvidenceRetriever:
         limites de frequência dos provedores externos.
         """
         for source in self._sources:
+            checkpoint()
             prepare = getattr(source, "prepare_for_claims", None)
             if callable(prepare) and source.is_available():
                 try:
@@ -3893,6 +3904,7 @@ class EvidenceRetriever:
 
         results: list[RetrievalResult] = []
         for index, claim in enumerate(claims):
+            checkpoint()
             results.append(self.retrieve(claim, top_k=top_k))
 
             if index < len(claims) - 1:

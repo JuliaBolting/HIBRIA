@@ -84,7 +84,7 @@ class SourceReputationService:
             )
             return result
 
-        if not DYNAMIC_ENABLED and trigger == "pipeline":
+        if not DYNAMIC_ENABLED and trigger in {"pipeline", "evidence"}:
             return SourceReputation(
                 identity=identity,
                 status="not_evaluated",

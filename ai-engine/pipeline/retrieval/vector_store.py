@@ -244,12 +244,12 @@ class VectorStore:
         start  = 0
 
         while start < len(text):
-            end = start + self.MAX_CHUNK_CHARS
+            end = min(len(text), start + self.MAX_CHUNK_CHARS)
 
             # tenta quebrar no espaço mais próximo para não cortar palavras
             if end < len(text):
                 last_space = text.rfind(" ", start, end)
-                if last_space > start:
+                if last_space > start + self.CHUNK_OVERLAP:
                     end = last_space
 
             chunk = text[start:end].strip()
@@ -257,7 +257,9 @@ class VectorStore:
                 chunks.append(chunk)
 
             # próximo chunk começa com sobreposição
-            start = end - self.CHUNK_OVERLAP
+            if end == len(text):
+                break
+            start = max(start + 1, end - self.CHUNK_OVERLAP)
 
         return chunks
 

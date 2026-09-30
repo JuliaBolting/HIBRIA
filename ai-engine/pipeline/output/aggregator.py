@@ -113,6 +113,34 @@ class Aggregator:
         return round(sum(scores) / len(scores), 4)
 
     @classmethod
+    def _directional_evidence(cls, result):
+        """Média por ponto: apoio soma, contradição subtrai, demais são neutros.
+
+        Similaridade mede relevância, não veracidade. Cada ponto tem peso igual,
+        independentemente de quantos documentos semelhantes retornaram.
+        """
+        stances = {
+            (value(s, "claim_id", ""), value(s, "evidence_id", "") or value(s, "url", "")):
+            value(s, "stance", "") for s in (result.stance_results or [])
+        }
+        scores = []
+        for item in result.similarity_scores or []:
+            comparisons = []
+            for ev in value(item, "evidences", []) or [value(item, "top_evidence")]:
+                similarity = value(ev, "similarity_final", value(item, "score", 0))
+                if not eligible(ev, similarity):
+                    continue
+                ref = value(ev, "evidence_id", "") or value(ev, "evidence_url", "")
+                stance = stances.get((value(item, "claim_id", ""), ref))
+                if stance not in {"support", "contradict", "neutral", "insufficient"}:
+                    continue
+                direction = 1 if stance == "support" else -1 if stance == "contradict" else 0
+                comparisons.append(clamp(float(similarity)) * direction)
+            if comparisons:
+                scores.append(sum(comparisons) / len(comparisons))
+        return sum(scores) / len(scores) if scores else 0.0
+
+    @classmethod
     def _calculate_coverage(cls, result: Any) -> float:
         """
         Mede a cobertura de evidências válidas.
@@ -273,7 +301,7 @@ class Aggregator:
                 return "não verificado"
             return "não verificado"
 
-        if coverage_score < cls.MIN_COVERAGE_FOR_PARTIAL:
+        if support_rate == 0 or coverage_score < cls.MIN_COVERAGE_FOR_PARTIAL:
             return "evidência insuficiente"
 
         if (
@@ -325,7 +353,8 @@ class Aggregator:
 
         # Cobertura baixa reduz o componente de evidência, mas não transforma
         # automaticamente a notícia em "não confiável".
-        evidence_component = evidence_score * coverage_score
+        directional_score = cls._directional_evidence(result)
+        evidence_component = directional_score * coverage_score
 
         weights = cls._normalize_component_weights(bertimbau_score, reputation_score)
 
@@ -352,6 +381,8 @@ class Aggregator:
             "score": final_score,
             "label": label,
             "breakdown": {
+                "scoring_version": "directional-2",
+                "evidence_directional_score": round(directional_score * 100, 2),
                 "evidence_score": round(evidence_score * 100, 2),
                 "coverage_score": round(coverage_score * 100, 2),
                 "evidence_component": round(evidence_component * 100, 2),

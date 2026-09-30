@@ -5,6 +5,8 @@ pela mesma validação. Ollama é uma conexão administrativa separada e local.
 """
 from __future__ import annotations
 
+from pipeline.cancellation import checkpoint
+
 import ipaddress
 import socket
 import time
@@ -80,6 +82,7 @@ def request(method, url, *, params=None, headers=None, json=None, data=None,
     deadline = time.monotonic() + 60
     history = []
     for hop in range(MAX_REDIRECTS + 1):
+        checkpoint()
         host, port, addresses = validate_url(current)
         parts = urlsplit(current)
         # O pool recebe o IP validado, nunca o hostname a ser resolvido de novo.
@@ -124,6 +127,7 @@ def request(method, url, *, params=None, headers=None, json=None, data=None,
                 continue
             chunks, size = [], 0
             for chunk in raw.stream(65536, decode_content=True):
+                checkpoint()
                 size += len(chunk)
                 if size > MAX_BYTES or time.monotonic() > deadline:
                     raise RequestException("Resposta externa excedeu o limite de tamanho ou tempo.")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pipeline.cancellation import checkpoint
 from urllib.parse import urlparse
 
 
@@ -37,6 +38,10 @@ class SourceTrustResolver:
         if os.getenv("HIBRIA_ALLOW_STATIC_TRUST", "false").lower() != "true":
             self.static_domains = set()
         self._cache: dict[str, float | None] = {}
+        try:
+            self._evaluations_left = max(0, min(10, int(os.getenv("HIBRIA_REFERENCE_REPUTATION_BUDGET", "2"))))
+        except ValueError:
+            self._evaluations_left = 2
 
     @staticmethod
     def _env_float(name: str, default: float) -> float:
@@ -46,6 +51,7 @@ class SourceTrustResolver:
             return default
 
     def reputation(self, value: str) -> float | None:
+        checkpoint()
         domain = _domain(value)
         if not domain:
             return None
@@ -65,11 +71,10 @@ class SourceTrustResolver:
                 with connection.cursor() as cursor:
                     cursor.execute(
                         """
-                        SELECT fr.score_reputacao
+                        SELECT fr.score_reputacao, fr.status_avaliacao
                         FROM fontes_reputacao fr
 
                         WHERE fr.dominio_canonico = %(domain)s
-                          AND fr.status_avaliacao = 'evaluated'
                           AND (fr.proxima_reavaliacao IS NULL
                                OR fr.proxima_reavaliacao > NOW())
                         ORDER BY fr.data_ultima_verificacao DESC
@@ -78,7 +83,18 @@ class SourceTrustResolver:
                         {"domain": domain},
                     )
                     row = cursor.fetchone()
-            score = float(row[0]) if row else None
+            score = float(row[0]) if row and row[1] == "evaluated" else None
+            if row is None and self._evaluations_left > 0:
+                from pipeline.analysis.reputation.service import SourceReputationService
+                from pipeline.analysis.reputation.repository import SourceReputationRepository
+                from pipeline.analysis.reputation.config import DYNAMIC_ENABLED
+                if DYNAMIC_ENABLED:
+                    self._evaluations_left -= 1
+                    checkpoint()
+                    service = SourceReputationService(repository=SourceReputationRepository(database_url=self.database_url))
+                    assessed = service.get_or_evaluate(domain, trigger="evidence")
+                    if assessed.status == "evaluated" and assessed.identity.canonical_domain == domain:
+                        score = float(assessed.score)
         except Exception:
             score = None
 

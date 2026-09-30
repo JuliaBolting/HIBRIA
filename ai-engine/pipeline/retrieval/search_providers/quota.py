@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pipeline.cancellation import checkpoint
+
 from datetime import datetime
 import json
 import os
@@ -51,6 +53,7 @@ class ProviderQuota:
     @classmethod
     def try_register(cls, provider: str) -> bool:
         """Reserva uma consulta de forma atômica antes da chamada externa."""
+        checkpoint()
         with cls._lock:
             data = cls._read()
             if not cls._within_limits(provider, data):
