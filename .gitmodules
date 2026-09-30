@@ -1,0 +1,3 @@
+[submodule "ai-engine/data/datasets/fake_br_corpus"]
+	path = ai-engine/data/datasets/fake_br_corpus
+	url = https://github.com/roneysco/Fake.br-Corpus.git
