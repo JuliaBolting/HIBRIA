@@ -71,7 +71,12 @@ def _within_public_rate_limit(client: str) -> bool:
 
 @app.middleware("http")
 async def proteger_api(request: Request, call_next):
-    path = request.url.path
+    # O caminho de autorização deve ser exatamente o usado pelo roteador ASGI.
+    # Nunca o derive do Host enviado pelo cliente.
+    path = request.scope.get("path", "")
+    hosts = request.headers.getlist("host")
+    if len(hosts) != 1 or any(c in hosts[0] for c in "/\\?#@ \t\r\n"):
+        return JSONResponse(status_code=400, content={"error": "Host inválido."})
     protected_path = path.startswith("/analyze") or path.startswith("/feedback")
 
     if protected_path and request.method != "OPTIONS":
