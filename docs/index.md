@@ -35,7 +35,6 @@ A análise automatizada não representa uma comprovação definitiva da veracida
 5. Armazenamento das informações
 As informações processadas pela HÍBRIA poderão ser armazenadas em sua infraestrutura, conforme as necessidades técnicas de funcionamento do sistema.
 O armazenamento deverá observar os princípios de necessidade, finalidade e segurança, limitando-se aos dados efetivamente necessários para as funcionalidades disponibilizadas.
-[DEFINIR ANTES DA PUBLICAÇÃO: informar quais dados são efetivamente persistidos no PostgreSQL, no FAISS, nos registros técnicos e por quanto tempo são mantidos.]
 Caso sejam armazenados dados pessoais, serão adotadas medidas para impedir sua conservação por períodos superiores aos necessários às finalidades informadas, ressalvadas as hipóteses legais de conservação.
 6. Compartilhamento de informações
 As informações extraídas das páginas são encaminhadas à infraestrutura da HÍBRIA para a execução das análises solicitadas.
@@ -74,7 +73,7 @@ Em caso de dúvidas, solicitações ou questionamentos relacionados ao tratament
 Projeto: HÍBRIA
 Responsável pelo tratamento dos dados: Julia Bolting e Luiza Vitória Queiroz.
 E-mail para assuntos de privacidade: hibriatcc@gmail.com 
-Endereço da Política de Privacidade: [URL DA POLÍTICA]
+Endereço da Política de Privacidade: https://juliabolting.github.io/HIBRIA/
 
 A HIBRIA reafirma seu compromisso com a transparência, a segurança da informação e o respeito à privacidade dos usuários, buscando garantir que o tratamento de dados ocorra de maneira responsável e em conformidade com a legislação aplicável.
 
